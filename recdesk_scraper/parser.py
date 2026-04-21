@@ -10,8 +10,14 @@ from .config import TARGET_AGE
 
 COLUMNS = [
     "Program Name", "Category", "Age / Age Range",
-    "Date(s)", "Day(s)", "Opening", "Remaining",
+    "Date(s)", "Day(s)", "Opening", "Remaining", "URL",
 ]
+
+PORTAL_ORIGIN = "https://jcrec.recdesk.com"
+
+
+def _is_full(remaining: str) -> bool:
+    return "full" in (remaining or "").lower()
 
 
 def _clean(text: str) -> str:
@@ -56,6 +62,8 @@ def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
         if "sub-category-header" in cls:
             link = tr.find("a", href=re.compile(r"programId="))
             name = _clean(link.get_text()) if link else "N/A"
+            href = link.get("href", "") if link else ""
+            url = (PORTAL_ORIGIN + href) if href.startswith("/") else (href or "")
 
             detail_tr = None
             j = i + 1
@@ -80,7 +88,7 @@ def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
             if not ages or ages.strip() in {"-", "N/A"}:
                 ages = extract_age_from_name(name) or ages
 
-            if age_includes(ages, target_age):
+            if age_includes(ages, target_age) and not _is_full(remaining):
                 results.append({
                     "Program Name": name,
                     "Category": current_category,
@@ -89,6 +97,7 @@ def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
                     "Day(s)": days or "N/A",
                     "Opening": opening or "N/A",
                     "Remaining": remaining or "N/A",
+                    "URL": url or "N/A",
                 })
         i += 1
 

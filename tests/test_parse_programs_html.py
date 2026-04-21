@@ -39,22 +39,17 @@ def all_programs():
 # ---------------------------------------------------------------------------
 
 EXPECTED_PRESENT = [
+    # Age-8 programs that are OPEN (not FULL) in the current fixtures.
     # (substring of program name, expected category, expected age range substring)
-    ("RHYTHM & ROOTS",                     "Music",         "8 to 18"),
-    ("Boxing @ MS# 7 Ages 7-11 (Mon/Wed)",  "Boxing",       "7-11"),
-    ("Boxing @ MS# 7 Ages 7-11 (Tue/Thu)",  "Boxing",       "7-11"),
-    ("Badminton @ Kotofit",                 "Badminton",    "7"),
-    ("Basketball @ Bayside Park Ages 7-8 (Fridays)", "Basketball", "7"),
-    ("Break Dancing",                       "Dance",        "7"),
-    ("Lacrosse @ PS # 26",                  "Lacrosse",     "7"),
-    ("Soccer Ball Mastery @ Gateway Field Ages 8-11", "Soccer", "8"),
-    ("Shoot 4 the Stars @ Martucci Ages 6-8", "Soccer",     "6"),
-    ("Tennis Beginners - Ages 6-10",        "Tennis",       "6"),
-    ("Tennis Advanced - Ages 6-10",         "Tennis",       "6"),
-    ("Track- Lincoln Park Ages 5-9 (Mon/Wed)", "Track and Field", "5"),
-    ("JC Rise Summer Camp: North-Session 1", "Summer Camp (JC Rise)", "6"),
-    ("Pershing Swim Class LTS 1 Sunday",     "Swim",        "6"),
-    ("Co-Ed Select - Advanced Soccer 2017-18", "Travel Soccer", "7"),
+    ("RHYTHM & ROOTS",                              "Music",                 "8 to 18"),
+    ("Boxing @ MS# 7 Ages 7-11 (Mon/Wed)",          "Boxing",                "7-11"),
+    ("Boxing @ MS# 7 Ages 7-11 (Tue/Thu)",          "Boxing",                "7-11"),
+    ("Basketball @ Bayside Park Ages 7-8 (Fridays)", "Basketball",           "7"),
+    ("Lacrosse @ PS # 26",                          "Lacrosse",              "7"),
+    ("Flag Football @ Franco Field",                "Flag Football",         "7"),
+    ("Football Spring Strength Conditioning",        "Football",             "7"),
+    ("BULLY PROOF PROGRAM",                          "Martial Arts",         "7"),
+    ("JC Rise Summer Camp: South",                   "Summer Camp (JC Rise)", "6"),
 ]
 
 
@@ -69,17 +64,20 @@ EXPECTED_ABSENT = [
     "PSA2",
     "Biddy",            # Basketball 4-6
     "2010 (Tues/Thurs)", # Travel Soccer 13-16
+    "Tennis Beginners", # currently FULL
+    "Tennis Advanced",  # currently FULL
+    "Break Dancing",    # currently FULL
 ]
 
 
-def test_returns_at_least_30_programs(all_programs):
-    """The portal currently has 35-ish age-8 programs across 3 pages."""
-    assert len(all_programs) >= 30, f"only got {len(all_programs)}"
+def test_returns_open_programs(all_programs):
+    """After filtering out FULL ones, at least a handful remain."""
+    assert len(all_programs) >= 5, f"only got {len(all_programs)}"
 
 
 def test_each_program_has_all_required_columns(all_programs):
     required = {"Program Name", "Category", "Age / Age Range",
-                "Date(s)", "Day(s)", "Opening", "Remaining"}
+                "Date(s)", "Day(s)", "Opening", "Remaining", "URL"}
     for p in all_programs:
         assert required.issubset(p.keys()), f"missing keys in {p}"
         assert p["Program Name"] != "N/A", f"name missing: {p}"
@@ -112,6 +110,22 @@ def test_dates_present_for_most_programs(all_programs):
     with_dates = sum(1 for p in all_programs if p["Date(s)"] != "N/A")
     assert with_dates >= 0.8 * len(all_programs), \
         f"only {with_dates}/{len(all_programs)} have dates"
+
+
+def test_no_full_programs(all_programs):
+    """FULL programs must be excluded from the output."""
+    for p in all_programs:
+        assert "full" not in p["Remaining"].lower(), \
+            f"FULL program leaked through: {p['Program Name']} (Remaining={p['Remaining']!r})"
+
+
+def test_every_program_has_portal_url(all_programs):
+    for p in all_programs:
+        url = p["URL"]
+        assert url and url != "N/A", f"missing URL for {p['Program Name']}"
+        assert "programId=" in url, f"unexpected URL format: {url!r}"
+        assert url.startswith("https://jcrec.recdesk.com/"), \
+            f"URL is not absolute: {url!r}"
 
 
 def test_categories_match_real_portal(all_programs):

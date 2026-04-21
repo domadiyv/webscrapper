@@ -52,7 +52,7 @@ async def run() -> None:
     print(f"Programs found for age {TARGET_AGE}: {len(programs)}")
 
     try:
-        send_email(out, programs)
+        send_email(programs)
     except Exception as exc:
         log.error("Email failed: %s", exc)
 
