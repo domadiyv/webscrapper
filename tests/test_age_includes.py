@@ -1,6 +1,6 @@
 """Tests for age_includes — covers every age format observed on the live portal."""
 import pytest
-from scraper import age_includes
+from recdesk_scraper import age_includes
 
 
 # --- Formats observed in the Ages cell of the FilterPrograms HTML ---

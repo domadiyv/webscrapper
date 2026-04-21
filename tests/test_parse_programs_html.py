@@ -7,9 +7,9 @@ from pathlib import Path
 
 import pytest
 
-from scraper import parse_programs_html, has_next_page
+from recdesk_scraper import parse_programs_html, has_next_page
 
-FIXTURES_DIR = Path(__file__).resolve().parent.parent
+FIXTURES_DIR = Path(__file__).resolve().parent / "fixtures"
 PAGES = [FIXTURES_DIR / f"probe_filter_page{i}.html" for i in (1, 2, 3)]
 
 

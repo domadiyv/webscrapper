@@ -1,6 +1,6 @@
 """Tests for extract_age_from_name — title fallback when Ages cell is missing."""
 import pytest
-from scraper import extract_age_from_name
+from recdesk_scraper import extract_age_from_name
 
 
 CASES = [

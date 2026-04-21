@@ -20,7 +20,10 @@ playwright install-deps chromium
 
 echo "=== Step 4: Making scripts executable ==="
 chmod +x "$SCRIPT_DIR/run.sh"
-chmod +x "$SCRIPT_DIR/scraper.py"
+
+if [ ! -f "$SCRIPT_DIR/.env" ] && [ -f "$SCRIPT_DIR/.env.example" ]; then
+    echo "No .env found. Copy .env.example to .env and fill in SMTP credentials to enable email."
+fi
 
 echo "=== Step 5: Registering cron job (daily 9 PM) ==="
 CRON_LINE="0 21 * * * $SCRIPT_DIR/run.sh >> $SCRIPT_DIR/logs/cron.log 2>&1"

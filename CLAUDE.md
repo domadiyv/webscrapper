@@ -1,45 +1,88 @@
 # CLAUDE.md
 
-This file provides guidance to Claude Code (claude.ai/code) when working with code in this repository.
+Guidance for Claude Code when working in this repository.
 
-## Setup & Running
+## Layout
+
+```
+recdesk_scraper/       package — one module per responsibility
+  config.py            env + .env loading, paths, EmailConfig
+  age.py               age_includes, extract_age_from_name
+  parser.py            parse_programs_html, has_next_page, COLUMNS
+  fetcher.py           Playwright cookie load + FilterPrograms POST loop
+  exporter.py          save_excel (sort, autofit, freeze header)
+  mailer.py            send_email — HTML list body + Excel attachment
+  __main__.py          `python -m recdesk_scraper`
+tests/
+  fixtures/            probe_filter_pageN.html (live-portal captures)
+  conftest.py          puts project root on sys.path
+  test_age_includes.py, test_extract_age_from_name.py, test_parse_programs_html.py
+scripts/               probe scripts for investigating portal changes
+output/                generated XLSX (gitignored)
+logs/                  run.sh output (gitignored)
+.env / .env.example    SMTP credentials (.env gitignored)
+```
+
+## Setup
 
 ```bash
-# One-time setup (creates venv, installs deps, registers 9 PM cron job)
+# Unix (one-time)
 bash setup.sh
 
-# Run scraper manually
-source .venv/bin/activate
-python scraper.py
-
-# Run via cron wrapper (logs to logs/scraper_YYYYMMDD_HHMMSS.log)
-bash run.sh
-```
-
-## Dependencies
-
-Python 3 + venv at `.venv/`. Install with:
-```bash
+# Windows (PowerShell)
+python -m venv .venv
+.venv\Scripts\Activate.ps1
 pip install -r requirements.txt
 playwright install chromium
-playwright install-deps
+
+# Configure email (optional)
+cp .env.example .env     # then fill in SMTP_* and EMAIL_TO
 ```
 
-No tests exist in this project.
+## Running
 
-## Architecture
+```bash
+python -m recdesk_scraper          # run the scraper
+pytest tests/ -v                   # run tests
+```
 
-Single-file scraper (`scraper.py`) targeting RecDesk community programs at `jcrec.recdesk.com`, filtered to age 8 (`TARGET_AGE = 8`). Output goes to `output/programs_age8_YYYYMMDD_HHMMSS.xlsx`.
+Windows:
+```
+.venv\Scripts\python.exe -m recdesk_scraper
+.venv\Scripts\python.exe -m pytest tests/ -v
+```
 
-**Two-stage scraping strategy** (preferred → fallback):
-1. **API interception** — Playwright intercepts XHR/fetch responses and parses JSON if the page makes API calls
-2. **DOM scraping** — Falls back to parsing table rows/cards with pagination support
+Output: `output/programs_age<AGE>_YYYYMMDD_HHMMSS.xlsx`.
 
-**Key functions:**
-- `age_includes(age_range_str, target)` — Parses many age formats ("6-9", "8+", "8 and up", etc.)
-- `extract_row_data(row)` — Extracts program fields from a DOM row element
-- `_parse_api_programs(data)` — Normalizes JSON API responses (handles multiple field name variants)
-- `scrape()` — Async entry point; drives Playwright Chromium, handles pagination and timeouts
-- `save_excel(programs)` — Writes sorted DataFrame to Excel with frozen header and auto-fit columns
+## Data flow
 
-**Scheduling:** `setup.sh` registers a cron job (`0 21 * * *`) that calls `run.sh`, which activates the venv and logs output.
+1. Playwright loads `/Community/Program` once to obtain session cookies.
+2. For each page N, POST `/Community/Program/FilterPrograms` with `Pagination.CurrentPageIndex = N`. The endpoint returns **HTML** (not JSON).
+3. `parse_programs_html` walks the tbody, tracking `category-header` rows to tag each following `sub-category-header` + `hidden-xs` detail pair.
+4. Each program's Ages cell (`"7y - 14y"`) is tested with `age_includes`. When the cell is empty/dashed, fall back to `extract_age_from_name` which extracts `"Ages 7-11"`-style phrases from the title.
+5. Stop paginating when `has_next_page` reports no higher numeric anchor. Dedupe by (name, dates, days). Write sorted Excel. Send email if SMTP configured.
+
+## Email
+
+`mailer.send_email` builds a multipart message:
+- **Text** part: numbered list of programs.
+- **HTML** part: styled table that renders natively in Gmail/web clients.
+- **Attachment**: the Excel file.
+
+Config is loaded from `.env` (via `python-dotenv`) or environment. Required: `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_TO`. Optional: `SMTP_PORT` (default 587), `SMTP_TLS` (default true), `EMAIL_FROM` (defaults to `SMTP_USER`). If any required var is missing, email is skipped and the run still succeeds.
+
+Gmail requires an **App Password** (not the account password): https://support.google.com/accounts/answer/185833
+
+## Secrets & public-repo hygiene
+
+- `.gitignore` excludes `.env`, `.venv/`, `__pycache__/`, `output/`, `logs/`, editor caches.
+- `.env` is never committed. `.env.example` is the template.
+- No secrets live in source — all sensitive values come from env vars loaded at runtime.
+
+## Scheduling
+
+`setup.sh` registers `0 21 * * * run.sh` on Linux/macOS. `run.sh` activates the venv and invokes `python -m recdesk_scraper`, logging to `logs/scraper_YYYYMMDD_HHMMSS.log`. Windows users should wire this up via Task Scheduler manually.
+
+## Regenerating test fixtures
+
+If the portal markup changes, re-run `scripts/probe3.py` (hits FilterPrograms for 3 pages) and move the captured HTML into `tests/fixtures/`.
