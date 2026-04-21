@@ -1,20 +1,25 @@
 #!/usr/bin/env python3
 """
-RecDesk Program Scraper
-Scrapes https://jcrec.recdesk.com/Community/Program and extracts all programs
-suitable for an 8-year-old, then saves results to a dated Excel file.
+RecDesk Program Scraper.
+
+Calls the RecDesk FilterPrograms endpoint with pagination, parses the returned
+HTML, filters programs that include TARGET_AGE, and writes results to Excel.
 """
 
 import asyncio
 import json
 import logging
+import os
 import re
+import smtplib
 import sys
 from datetime import datetime
+from email.message import EmailMessage
 from pathlib import Path
 
 import pandas as pd
-from playwright.async_api import async_playwright, TimeoutError as PlaywrightTimeout
+from bs4 import BeautifulSoup
+from playwright.async_api import async_playwright
 
 logging.basicConfig(
     level=logging.INFO,
@@ -23,349 +28,315 @@ logging.basicConfig(
 )
 log = logging.getLogger(__name__)
 
-URL = "https://jcrec.recdesk.com/Community/Program"
+BASE_URL = "https://jcrec.recdesk.com/Community/Program"
+FILTER_API = "https://jcrec.recdesk.com/Community/Program/FilterPrograms"
 OUTPUT_DIR = Path(__file__).parent / "output"
 TARGET_AGE = 8
+MAX_PAGES = 50  # safety cap
 
 
 # ---------------------------------------------------------------------------
-# Age-range helpers
+# Age-range parsing
 # ---------------------------------------------------------------------------
 
 def age_includes(age_text: str, target: int = TARGET_AGE) -> bool:
-    """Return True if *age_text* covers *target* age."""
+    """Return True if `age_text` covers `target` age.
+
+    Handles forms seen on the live portal:
+      "7y - 14y", "8y - 8y", "Ages 7-11", "Ages 8 to 18",
+      "Ages 12+", "8 and up", "8 & up", "8 or older",
+      single number "8", "Ages: 7-9".
+    """
     if not age_text:
         return False
     text = age_text.strip().lower()
-    # strip common prefixes
     text = re.sub(r"^ages?\s*:?\s*", "", text)
+    text = text.replace("y", " ")  # "7y - 14y" -> "7  - 14 "
 
-    # "6-9", "6–9", "6 to 9"
-    m = re.search(r"(\d+)\s*(?:[-–]|to)\s*(\d+)", text)
+    m = re.search(r"(\d+)\s*(?:[-–—]|to)\s*(\d+)", text)
     if m:
-        return int(m.group(1)) <= target <= int(m.group(2))
+        lo, hi = int(m.group(1)), int(m.group(2))
+        return lo <= target <= hi
 
-    # "8+", "8 & up", "8 and up", "8 or older"
-    m = re.search(r"(\d+)\s*(?:\+|&\s*up|and\s*up|or\s*older)", text)
+    m = re.search(r"(\d+)\s*(?:\+|&\s*up|and\s*up|or\s*older|or\s*up)", text)
     if m:
         return int(m.group(1)) <= target
 
-    # bare number
     m = re.fullmatch(r"\s*(\d+)\s*", text)
     if m:
         return int(m.group(1)) == target
 
-    # fallback – grab all numbers and treat as range
     nums = [int(n) for n in re.findall(r"\d+", text)]
-    if nums:
+    if len(nums) == 1:
+        return nums[0] == target
+    if len(nums) >= 2:
         return min(nums) <= target <= max(nums)
-
     return False
 
 
+def extract_age_from_name(name: str) -> str:
+    """Pull an age phrase out of a program name (fallback when Ages cell empty).
+
+    Example: "2026 Spring - Boxing @ MS# 7 Ages 7-11 (Mon/Wed)" -> "Ages 7-11"
+    """
+    if not name:
+        return ""
+    m = re.search(
+        r"ages?\s*[:\-]?\s*\d+\s*(?:[-–—to]+\s*\d+|\+|&\s*up|and\s*up|or\s*older)?",
+        name,
+        re.IGNORECASE,
+    )
+    return m.group(0).strip() if m else ""
+
+
 # ---------------------------------------------------------------------------
-# DOM-scraping helpers
+# HTML parsing
 # ---------------------------------------------------------------------------
 
-def _text(value) -> str:
-    return (value or "").strip() or "N/A"
+# Single-source-of-truth schema. Used everywhere we shape program rows.
+COLUMNS = ["Program Name", "Category", "Age / Age Range",
+           "Date(s)", "Day(s)", "Opening", "Remaining"]
 
 
-async def _safe_inner_text(el, selector: str) -> str:
-    try:
-        node = await el.query_selector(selector)
-        if node:
-            return (await node.inner_text()).strip()
-    except Exception:
-        pass
+def _clean(text: str) -> str:
+    return re.sub(r"\s+", " ", text or "").strip()
+
+
+def _cell_value_after_label(tr, label: str) -> str:
+    """Inside a <tr>, find a <td> whose first child text is `label` and return
+    the text under it (the value lives in the small.text-muted span/<small>)."""
+    for td in tr.find_all("td", recursive=False):
+        head = td.find(class_="text-semibold")
+        if head and _clean(head.get_text()).lower() == label.lower():
+            small = td.find("small")
+            if small:
+                return _clean(small.get_text(" ", strip=True))
+            return _clean(td.get_text(" ", strip=True).removeprefix(label).strip())
     return ""
 
 
-async def extract_row_data(row) -> dict | None:
-    """
-    Pull fields from a single <tr> or program-card element.
-    RecDesk community pages render a table with columns:
-      Program Name | Age | Dates | Days | Opening | Remaining
-    We try both table-cell indexing and named attribute selectors.
-    """
-    cells = await row.query_selector_all("td")
+def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
+    """Parse a FilterPrograms HTML response and return matching programs."""
+    soup = BeautifulSoup(html, "html.parser")
+    tbody = soup.select_one("table.table-vcenter > tbody")
+    if not tbody:
+        return []
 
-    if len(cells) >= 6:
-        name     = _text(await cells[0].inner_text())
-        age_raw  = _text(await cells[1].inner_text())
-        dates    = _text(await cells[2].inner_text())
-        days     = _text(await cells[3].inner_text())
-        opening  = _text(await cells[4].inner_text())
-        remaining = _text(await cells[5].inner_text())
-    elif len(cells) >= 5:
-        name     = _text(await cells[0].inner_text())
-        age_raw  = _text(await cells[1].inner_text())
-        dates    = _text(await cells[2].inner_text())
-        days     = _text(await cells[3].inner_text())
-        opening  = _text(await cells[4].inner_text())
-        remaining = "N/A"
-    else:
-        # Try card-style layout with labelled spans/divs
-        name      = await _safe_inner_text(row, ".program-name, .programName, h3, h4, .name")
-        age_raw   = await _safe_inner_text(row, ".age, .ageRange, [data-label='Age']")
-        dates     = await _safe_inner_text(row, ".dates, .date, [data-label='Dates'], [data-label='Date']")
-        days      = await _safe_inner_text(row, ".days, .day, [data-label='Days']")
-        opening   = await _safe_inner_text(row, ".opening, [data-label='Opening']")
-        remaining = await _safe_inner_text(row, ".remaining, [data-label='Remaining']")
-        if not name:
-            return None
+    results: list[dict] = []
+    current_category = "N/A"
 
-    if not age_includes(age_raw):
-        return None
+    children = [c for c in tbody.find_all("tr", recursive=False)]
+    i = 0
+    while i < len(children):
+        tr = children[i]
 
-    return {
-        "Program Name": name,
-        "Age / Age Range": _text(age_raw),
-        "Date(s)": dates,
-        "Day(s)": days,
-        "Opening": opening,
-        "Remaining": remaining,
-    }
-
-
-# ---------------------------------------------------------------------------
-# Network-intercept helper  (tries to grab JSON from XHR/fetch calls)
-# ---------------------------------------------------------------------------
-
-def _parse_api_programs(payload: list) -> list[dict]:
-    """
-    Try to normalise a list of dicts returned by the RecDesk API into our
-    schema.  Field names vary by RecDesk version; we probe several candidates.
-    """
-    results = []
-    for p in payload:
-        if not isinstance(p, dict):
+        # Category header row
+        cat_td = tr.find("td", class_="category-header")
+        if cat_td:
+            strong = cat_td.find("strong")
+            if strong:
+                current_category = _clean(strong.get_text())
+            i += 1
             continue
 
-        name = (
-            p.get("programName") or p.get("name") or p.get("ProgramName") or ""
-        ).strip()
+        cls = " ".join(tr.get("class", []))
+        if "sub-category-header" in cls:
+            # Program title row
+            link = tr.find("a", href=re.compile(r"programId="))
+            name = _clean(link.get_text()) if link else "N/A"
 
-        age_raw = (
-            p.get("ageRange") or p.get("age") or p.get("Age") or
-            p.get("AgeRange") or p.get("minAge", "") or ""
-        )
-        if isinstance(age_raw, (int, float)):
-            age_raw = str(int(age_raw))
+            # The next non-mobile detail row is the desktop "hidden-xs" row.
+            detail_tr = None
+            j = i + 1
+            while j < len(children):
+                next_tr = children[j]
+                ncls = " ".join(next_tr.get("class", []))
+                if "sub-category-header" in ncls or next_tr.find("td", class_="category-header"):
+                    break
+                if "hidden-xs" in ncls:
+                    detail_tr = next_tr
+                    break
+                j += 1
 
-        # Compose range string if separate min/max fields exist
-        if not age_raw and ("minAge" in p or "maxAge" in p):
-            lo = p.get("minAge", "")
-            hi = p.get("maxAge", "")
-            age_raw = f"{lo}-{hi}" if lo and hi else str(lo or hi)
+            ages = dates = days = opening = remaining = ""
+            if detail_tr is not None:
+                dates    = _cell_value_after_label(detail_tr, "Dates")
+                days     = _cell_value_after_label(detail_tr, "Days")
+                ages     = _cell_value_after_label(detail_tr, "Ages")
+                opening  = _cell_value_after_label(detail_tr, "Openings")
+                remaining = _cell_value_after_label(detail_tr, "Remaining")
 
-        if not age_includes(str(age_raw)):
-            continue
+            # If Ages cell is empty/dash, fall back to parsing the program name
+            if not ages or ages.strip() in {"-", "N/A"}:
+                ages = extract_age_from_name(name) or ages
 
-        dates = (
-            p.get("dates") or p.get("startDate") or p.get("Dates") or
-            p.get("sessionDates") or "N/A"
-        )
-        days = (
-            p.get("days") or p.get("Days") or p.get("dayOfWeek") or "N/A"
-        )
-        opening   = str(p.get("openings",  p.get("opening",  p.get("Opening",  "N/A"))))
-        remaining = str(p.get("remaining", p.get("Remaining", p.get("spotsLeft", "N/A"))))
+            if age_includes(ages, target_age):
+                results.append({
+                    "Program Name": name,
+                    "Category": current_category,
+                    "Age / Age Range": ages or "N/A",
+                    "Date(s)": dates or "N/A",
+                    "Day(s)": days or "N/A",
+                    "Opening": opening or "N/A",
+                    "Remaining": remaining or "N/A",
+                })
+        i += 1
 
-        results.append({
-            "Program Name": name or "N/A",
-            "Age / Age Range": str(age_raw),
-            "Date(s)": str(dates),
-            "Day(s)": str(days),
-            "Opening": opening,
-            "Remaining": remaining,
-        })
     return results
 
 
+def has_next_page(html: str, current_page: int) -> bool:
+    """Return True if the pagination block links to a page > current_page."""
+    soup = BeautifulSoup(html, "html.parser")
+    pagination = soup.select_one("ul.pagination, .pagination")
+    if not pagination:
+        return False
+    # Look for any anchor whose text is a number > current_page, or a "»" Next link.
+    for a in pagination.find_all("a"):
+        txt = _clean(a.get_text())
+        if txt.isdigit() and int(txt) > current_page:
+            return True
+        if txt in ("»", "Next") and "disabled" not in " ".join(a.parent.get("class", [])):
+            # Conservative: only treat » as next if some numeric > current exists too
+            pass
+    # Also detect by max numeric link
+    nums = [int(_clean(a.get_text())) for a in pagination.find_all("a")
+            if _clean(a.get_text()).isdigit()]
+    return bool(nums) and max(nums) > current_page
+
+
 # ---------------------------------------------------------------------------
-# Main scraper
+# Network — Playwright drives only the initial page-load to get cookies, then
+# we hit the JSON-POST FilterPrograms endpoint directly per page.
 # ---------------------------------------------------------------------------
 
-async def scrape() -> list[dict]:
-    programs: list[dict] = []
-    api_data: list[dict] = []          # filled if we catch an API response
-    api_done = asyncio.Event()
-
+async def fetch_all_html_pages() -> list[str]:
+    pages_html: list[str] = []
     async with async_playwright() as pw:
         browser = await pw.chromium.launch(headless=True, args=["--no-sandbox"])
-        context = await browser.new_context(
-            user_agent=(
-                "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
-                "AppleWebKit/537.36 (KHTML, like Gecko) "
-                "Chrome/124.0.0.0 Safari/537.36"
-            ),
-            viewport={"width": 1280, "height": 900},
+        ctx = await browser.new_context(
+            user_agent=("Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                        "AppleWebKit/537.36 (KHTML, like Gecko) "
+                        "Chrome/124.0.0.0 Safari/537.36"),
         )
-        page = await context.new_page()
+        page = await ctx.new_page()
+        log.info("Loading %s for cookies…", BASE_URL)
+        await page.goto(BASE_URL, wait_until="domcontentloaded", timeout=60_000)
+        await page.wait_for_timeout(1_500)
 
-        # ── intercept JSON API responses ──────────────────────────────────
-        async def on_response(response):
-            ct = response.headers.get("content-type", "")
-            if "json" not in ct:
-                return
-            url = response.url
-            # RecDesk API paths contain "Program" or "program"
-            if not re.search(r"program", url, re.I):
-                return
-            try:
-                body = await response.json()
-            except Exception:
-                return
-
-            # body may be a list directly or nested under a key
-            rows = body if isinstance(body, list) else None
-            if rows is None and isinstance(body, dict):
-                for key in ("data", "programs", "results", "items", "Programs"):
-                    if isinstance(body.get(key), list):
-                        rows = body[key]
-                        break
-
-            if rows:
-                log.info("Intercepted API response from %s (%d items)", url, len(rows))
-                api_data.extend(rows)
-                api_done.set()
-
-        page.on("response", on_response)
-
-        # ── navigate ──────────────────────────────────────────────────────
-        log.info("Navigating to %s", URL)
-        try:
-            await page.goto(URL, wait_until="networkidle", timeout=90_000)
-        except PlaywrightTimeout:
-            log.warning("networkidle timed out; continuing anyway")
-
-        # Give JS a moment to fire additional requests
-        await page.wait_for_timeout(4_000)
-
-        # ── use API data if captured ───────────────────────────────────────
-        if api_data:
-            log.info("Using API data (%d raw records)", len(api_data))
-            programs = _parse_api_programs(api_data)
-            log.info("After age filter: %d programs", len(programs))
-            await browser.close()
-            return programs
-
-        # ── fall back to DOM scraping ─────────────────────────────────────
-        log.info("No API data intercepted; falling back to DOM scraping")
-
-        page_num = 1
-        while True:
-            log.info("Scraping DOM page %d", page_num)
-
-            # Wait for at least one program row
-            try:
-                await page.wait_for_selector(
-                    "table tbody tr, .program-item, .programItem, [class*='program-row']",
-                    timeout=15_000,
-                )
-            except PlaywrightTimeout:
-                log.warning("No program rows found on page %d", page_num)
-                break
-
-            # Scroll to bottom to trigger any lazy-loading
-            await page.evaluate("window.scrollTo(0, document.body.scrollHeight)")
-            await page.wait_for_timeout(1_500)
-
-            rows = await page.query_selector_all(
-                "table tbody tr, .program-item, .programItem, [class*='program-row']"
+        for page_num in range(1, MAX_PAGES + 1):
+            payload = {
+                "ProgramName": "", "Code": "", "ProgramNameXS": "",
+                "DateRangeSelection": "", "DateRangeFrom": "", "DateRangeTo": "",
+                "ProgramType": "0", "Age": "", "Facility": "0", "Days": "0",
+                "Pagination": {"CurrentPageIndex": page_num, "LoadMore": False},
+            }
+            resp = await ctx.request.post(
+                FILTER_API,
+                data=json.dumps(payload),
+                headers={
+                    "Content-Type": "application/json",
+                    "X-Requested-With": "XMLHttpRequest",
+                    "Accept": "text/html, */*; q=0.01",
+                    "Referer": BASE_URL,
+                },
             )
-            log.info("Found %d row elements", len(rows))
-
-            for row in rows:
-                try:
-                    data = await extract_row_data(row)
-                    if data:
-                        programs.append(data)
-                except Exception as exc:
-                    log.debug("Row parse error: %s", exc)
-
-            # ── pagination ────────────────────────────────────────────────
-            next_btn = None
-            for sel in [
-                "a[aria-label='Next']:not(.disabled)",
-                "button[aria-label='Next']:not([disabled])",
-                ".pagination .next:not(.disabled) a",
-                "li.next:not(.disabled) a",
-                "a:text('Next')",
-                "button:text('Next')",
-            ]:
-                try:
-                    candidate = page.locator(sel).first
-                    if await candidate.count() and await candidate.is_visible():
-                        next_btn = candidate
-                        break
-                except Exception:
-                    pass
-
-            if next_btn is None:
-                log.info("No next-page button found; done paginating")
+            if resp.status != 200:
+                log.warning("Page %d returned status %d", page_num, resp.status)
                 break
-
-            log.info("Clicking next page button (page %d → %d)", page_num, page_num + 1)
-            await next_btn.click()
-            await page.wait_for_load_state("networkidle", timeout=30_000)
-            await page.wait_for_timeout(2_000)
-            page_num += 1
+            body = await resp.text()
+            log.info("Page %d fetched (%d bytes)", page_num, len(body))
+            pages_html.append(body)
+            if not has_next_page(body, page_num):
+                log.info("No further pages after %d", page_num)
+                break
 
         await browser.close()
-
-    log.info("Total programs for age %d: %d", TARGET_AGE, len(programs))
-    return programs
+    return pages_html
 
 
 # ---------------------------------------------------------------------------
 # Excel export
 # ---------------------------------------------------------------------------
 
+def _date_sort_key(date_str: str):
+    if not date_str or date_str == "N/A":
+        return datetime.max
+    first = re.split(r"\s*[-–]\s*", date_str)[0].strip()
+    for fmt in ("%m/%d/%Y", "%m-%d-%Y", "%Y-%m-%d", "%b %d, %Y", "%B %d, %Y", "%m/%d/%y"):
+        try:
+            return datetime.strptime(first, fmt)
+        except ValueError:
+            continue
+    return datetime.max
+
+
 def save_excel(programs: list[dict]) -> Path:
     OUTPUT_DIR.mkdir(exist_ok=True)
-
-    if not programs:
-        log.warning("No programs found for age %d — saving empty file", TARGET_AGE)
-
-    df = pd.DataFrame(programs, columns=[
-        "Program Name", "Age / Age Range", "Date(s)", "Day(s)", "Opening", "Remaining"
-    ])
-
-    # Sort by date (best-effort: parse first token as date)
-    def _sort_key(date_str: str):
-        for fmt in ("%m/%d/%Y", "%m-%d-%Y", "%Y-%m-%d", "%b %d, %Y", "%B %d, %Y"):
-            try:
-                first = date_str.split(" - ")[0].split("–")[0].strip()
-                return datetime.strptime(first, fmt)
-            except ValueError:
-                pass
-        return datetime.max
-
-    df["_sort"] = df["Date(s)"].apply(_sort_key)
-    df.sort_values("_sort", inplace=True)
-    df.drop(columns=["_sort"], inplace=True)
-    df.reset_index(drop=True, inplace=True)
+    df = pd.DataFrame(programs, columns=COLUMNS)
+    if not df.empty:
+        df["_sort"] = df["Date(s)"].apply(_date_sort_key)
+        df.sort_values(["_sort", "Program Name"], inplace=True)
+        df.drop(columns=["_sort"], inplace=True)
+        df.reset_index(drop=True, inplace=True)
 
     timestamp = datetime.now().strftime("%Y%m%d_%H%M%S")
-    out_path = OUTPUT_DIR / f"programs_age8_{timestamp}.xlsx"
-
+    out_path = OUTPUT_DIR / f"programs_age{TARGET_AGE}_{timestamp}.xlsx"
     with pd.ExcelWriter(out_path, engine="openpyxl") as writer:
-        df.to_excel(writer, index=False, sheet_name="Programs Age 8")
-
-        ws = writer.sheets["Programs Age 8"]
-
-        # Auto-fit column widths
+        df.to_excel(writer, index=False, sheet_name=f"Programs Age {TARGET_AGE}")
+        ws = writer.sheets[f"Programs Age {TARGET_AGE}"]
         for col in ws.columns:
-            max_len = max(len(str(cell.value or "")) for cell in col)
+            max_len = max((len(str(cell.value or "")) for cell in col), default=10)
             ws.column_dimensions[col[0].column_letter].width = min(max_len + 4, 60)
-
-        # Freeze header row
         ws.freeze_panes = "A2"
-
     log.info("Saved → %s", out_path)
     return out_path
+
+
+# ---------------------------------------------------------------------------
+# Email (optional — requires env vars; silently skipped otherwise)
+# ---------------------------------------------------------------------------
+
+def maybe_send_email(out_path: Path, programs: list[dict]) -> None:
+    """Send the Excel file as an email attachment if SMTP env vars are set.
+
+    Required env vars:
+      SMTP_HOST, SMTP_PORT, SMTP_USER, SMTP_PASSWORD, EMAIL_TO
+    Optional: EMAIL_FROM (defaults to SMTP_USER), SMTP_TLS (default 'true')
+    """
+    host = os.environ.get("SMTP_HOST")
+    to_addr = os.environ.get("EMAIL_TO")
+    user = os.environ.get("SMTP_USER")
+    pw = os.environ.get("SMTP_PASSWORD")
+    if not all([host, to_addr, user, pw]):
+        log.info("Email not sent (SMTP env vars not configured)")
+        return
+    port = int(os.environ.get("SMTP_PORT", "587"))
+    from_addr = os.environ.get("EMAIL_FROM", user)
+    use_tls = os.environ.get("SMTP_TLS", "true").lower() == "true"
+
+    msg = EmailMessage()
+    msg["Subject"] = f"RecDesk Programs (age {TARGET_AGE}) — {datetime.now():%Y-%m-%d}"
+    msg["From"] = from_addr
+    msg["To"] = to_addr
+    msg.set_content(
+        f"Daily RecDesk scrape complete.\n\n"
+        f"Programs matching age {TARGET_AGE}: {len(programs)}\n"
+        f"Attached: {out_path.name}\n"
+    )
+    with open(out_path, "rb") as f:
+        msg.add_attachment(
+            f.read(),
+            maintype="application",
+            subtype="vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+            filename=out_path.name,
+        )
+    with smtplib.SMTP(host, port) as smtp:
+        if use_tls:
+            smtp.starttls()
+        smtp.login(user, pw)
+        smtp.send_message(msg)
+    log.info("Emailed report to %s", to_addr)
 
 
 # ---------------------------------------------------------------------------
@@ -374,10 +345,36 @@ def save_excel(programs: list[dict]) -> Path:
 
 async def main():
     log.info("=== RecDesk scraper started  target_age=%d ===", TARGET_AGE)
-    programs = await scrape()
-    path = save_excel(programs)
-    print(f"\nDone. Output file: {path}")
-    print(f"Programs found: {len(programs)}")
+    html_pages = await fetch_all_html_pages()
+    log.info("Fetched %d HTML pages", len(html_pages))
+
+    programs: list[dict] = []
+    for idx, html in enumerate(html_pages, 1):
+        page_progs = parse_programs_html(html, TARGET_AGE)
+        log.info("Page %d → %d matching programs", idx, len(page_progs))
+        programs.extend(page_progs)
+
+    # Dedupe — portal occasionally lists same program twice with different ids
+    seen, deduped = set(), []
+    for p in programs:
+        key = (p["Program Name"], p["Date(s)"], p["Day(s)"])
+        if key in seen:
+            continue
+        seen.add(key)
+        deduped.append(p)
+    if len(deduped) != len(programs):
+        log.info("Removed %d duplicate row(s)", len(programs) - len(deduped))
+    programs = deduped
+
+    log.info("Total matching programs: %d", len(programs))
+    out = save_excel(programs)
+    print(f"\nDone. Output file: {out}")
+    print(f"Programs found for age {TARGET_AGE}: {len(programs)}")
+
+    try:
+        maybe_send_email(out, programs)
+    except Exception as exc:
+        log.error("Email failed: %s", exc)
 
 
 if __name__ == "__main__":

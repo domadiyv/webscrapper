@@ -1,0 +1,182 @@
+
+
+<div class="panel panel-rd-main panel-rounded">
+    <div class="panel-heading hidden-xs">
+        <h2 class="panel-title h3">Programs</h2>
+    </div>
+
+    <div class="results" aria-busy="false">
+        <div class="loading" role="status" aria-live="polite">
+	<div class="loading-bg text-center">
+		<span class="fa fa-spinner fa-spin" aria-hidden="true"></span>
+        <span>Loading...</span>
+	</div>
+</div>
+
+
+
+        <table class="table table-vcenter mar-no">
+            <caption class="sr-only">Programs list</caption>
+            <thead>
+                <tr>
+                    <th scope="col" class="sr-only">Date</th>
+                    <th scope="col" class="sr-only">Day</th>
+                    <th scope="col" class="sr-only">Age</th>
+                    <th scope="col" class="sr-only">Grade</th>
+                    <th scope="col" class="sr-only">Openings</th>
+                    <th scope="col" class="sr-only">Remaining</th>
+                    <th scope="col" class="sr-only">Action</th>
+                </tr>
+            </thead>
+            <tbody>
+
+
+            </tbody>
+        </table>
+
+
+
+<div style="margin-top: 20px;">
+    <div class="text-center" style="margin-bottom: 10px;">
+        <span class="fa fa-search" style="font-size: 60px; color: #767676;" aria-hidden="true"></span>
+        <p style="margin-top: 20px; font-size: 24px; color: #333;">
+            No results found
+        </p>
+    </div>
+
+    <div class="text-center pad-btm">
+            <a href="/Community/Program" class="text-primary text-semibold" style="font-size: 14px; text-decoration: underline; padding: 5px 10px; display: inline-block">
+                Reset filters
+            </a>
+    </div>
+</div>
+    </div>
+</div>
+
+<script>
+	$(document).ready(function () {
+        $('.btn-waitlist').click(function () {
+            var $triggerBtn = $(this);
+            var program_id = $triggerBtn.data('program-id');
+            var household_id = $triggerBtn.data('household-id');
+
+			if (household_id == "") {
+				location.href = "/Community/Member/Login?redirect=" + rdEncodeURL(location);
+				return;
+			}
+
+			$.ajax({
+				url: "/Community/Program/WaitList",
+				dataType: "html",
+				contentType: "application/json; charset=utf-8",
+				type: "POST",
+				data: JSON.stringify({ programId: program_id, householdId: household_id }),
+                success: function (data) {
+                    var $modal = $("#waitlist-modal");
+                    $modal.html(data);
+
+                    $modal.modal('show');
+
+                    $modal.on('shown.bs.modal', function () {
+                        $('modalLabel').focus();
+                    });
+
+                    $modal.on('hidden.bs.modal', function () {
+                        $triggerBtn.focus();
+                    });
+				},
+                error: function (exception) {
+					if (exception.status == 401) {
+						location.href = "/Community/Member/Login?redirect=" + rdEncodeURL(location);
+                    } else {
+                        console.error("Waitlist load error:", exception);
+						alert("Unable to load the wait list form.");
+					}
+				}
+			});
+		});
+	});
+</script>
+
+<div class="modal fade" id="waitlist-modal" tabindex="-1" role="dialog" aria-modal="true" aria-label="waitlist modal"></div>
+
+<script>
+	$(document).ready(function () {
+		$(".rd-btn-pre-cart-plus").click(function () {
+			addToPreCart($(this).data("type"), $(this).data("id"), $(this).data("description"));
+			// change colors
+			$(this).closest("tr").addClass("rd-item-selected")
+				.next().addClass("rd-item-selected-info")
+				.next().addClass("rd-item-selected-info");
+			$(this).closest("tr").find(".rd-btn-pre-cart-minus").css("display", "inline-block");
+			$(this).css("display", "none");
+
+			// if it is in a modal (calendar)
+			var isModal = $(this).closest(".modal-footer").length > 0;
+			if (isModal)
+				$(this).closest(".modal-footer").find(".rd-btn-pre-cart-minus").css("display", "inline-block");
+		});
+
+		$(".rd-btn-pre-cart-minus").click(function () {
+			removeFromPreCart($(this).data("type"), $(this).data("id"), $(this).data("description"));
+			// change colors
+			$(this).closest("tr").removeClass("rd-item-selected")
+				.next().removeClass("rd-item-selected-info")
+				.next().removeClass("rd-item-selected-info");
+			$(this).closest("tr").find(".rd-btn-pre-cart-plus").css("display", "inline-block");
+			$(this).css("display", "none");
+
+			// if it is in a modal (calendar)
+			var isModal = $(this).closest(".modal-footer").length > 0;
+			if (isModal)
+				$(this).closest(".modal-footer").find(".rd-btn-pre-cart-plus").css("display", "inline-block");
+		});
+
+		
+	});
+
+	// This function should be available from ALL item lists
+	function addToPreCart(type, id, description) {
+		if (type == null || id == null || description == null) {
+			alert("Error: Can't add to pre cart");
+			return;
+		}
+
+		$.ajax({
+			url: "/Community/PreCart/AddToPreCart",
+			dataType: "json",
+			contentType: "application/json; charset=utf-8",
+			type: "POST",
+			data: JSON.stringify({ Type: type, Id: id, Description: description }),
+			success: function (data) {
+				renderPreCart(data);
+			},
+			error: function () {
+				alert("Couldn't add to pre cart. Please try again later");
+			}
+		});
+	}
+
+	function removeFromPreCart(type, id, description) {
+		if (type == null || id == null || description == null) {
+			alert("Error: Can't remove from pre cart");
+			return;
+		}
+
+		$.ajax({
+			url: "/Community/PreCart/RemoveFromPreCart",
+			dataType: "json",
+			contentType: "application/json; charset=utf-8",
+			type: "POST",
+			data: JSON.stringify({ Type: type, Id: id, Description: description }),
+			success: function (data) {
+				renderPreCart(data);
+			},
+			error: function () {
+				alert("Couldn't remove from pre cart. Please try again later");
+			}
+		});
+	}
+</script>
+
+
