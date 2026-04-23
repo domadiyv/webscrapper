@@ -3,11 +3,21 @@ from __future__ import annotations
 
 import json
 import logging
+import os
+from pathlib import Path
 
 from playwright.async_api import async_playwright
 
 from .config import BASE_URL, FILTER_API, MAX_PAGES
 from .parser import has_next_page
+
+# Fallback to the pre-installed Chromium when the Playwright-managed binary is absent.
+_FALLBACK_CHROMIUM = "/opt/pw-browsers/chromium-1194/chrome-linux/chrome"
+
+
+def _chromium_executable() -> str | None:
+    path = Path(_FALLBACK_CHROMIUM)
+    return str(path) if path.exists() else None
 
 log = logging.getLogger(__name__)
 
@@ -30,8 +40,19 @@ def _payload(page_num: int) -> dict:
 async def fetch_all_html_pages() -> list[str]:
     pages_html: list[str] = []
     async with async_playwright() as pw:
-        browser = await pw.chromium.launch(headless=True, args=["--no-sandbox"])
-        ctx = await browser.new_context(user_agent=_USER_AGENT)
+        launch_kwargs: dict = {
+            "headless": True,
+            "args": ["--no-sandbox", "--ignore-certificate-errors"],
+        }
+        fallback = _chromium_executable()
+        if fallback:
+            log.info("Using fallback Chromium: %s", fallback)
+            launch_kwargs["executable_path"] = fallback
+        browser = await pw.chromium.launch(**launch_kwargs)
+        ctx = await browser.new_context(
+            user_agent=_USER_AGENT,
+            ignore_https_errors=True,
+        )
         page = await ctx.new_page()
         log.info("Loading %s for cookies…", BASE_URL)
         await page.goto(BASE_URL, wait_until="domcontentloaded", timeout=60_000)
