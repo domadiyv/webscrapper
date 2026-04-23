@@ -77,7 +77,7 @@ def test_returns_open_programs(all_programs):
 
 def test_each_program_has_all_required_columns(all_programs):
     required = {"Program Name", "Category", "Age / Age Range",
-                "Date(s)", "Day(s)", "Opening", "Remaining", "URL"}
+                "Date(s)", "Day(s)", "Opening", "Remaining", "URL", "Registration Status"}
     for p in all_programs:
         assert required.issubset(p.keys()), f"missing keys in {p}"
         assert p["Program Name"] != "N/A", f"name missing: {p}"

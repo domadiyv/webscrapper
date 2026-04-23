@@ -62,7 +62,9 @@ Output: `output/programs_age<AGE>_YYYYMMDD_HHMMSS.xlsx`.
 4. Each program's Ages cell (`"7y - 14y"`) is tested with `age_includes`. When the cell is empty/dashed, fall back to `extract_age_from_name` which extracts `"Ages 7-11"`-style phrases from the title.
 5. **FULL programs are skipped** — if the Remaining cell contains the `FULL` badge, the program is excluded.
 6. Each program's registration URL (`…/Community/Program/Detail?programId=…`) is captured as an absolute link.
-7. Stop paginating when `has_next_page` reports no higher numeric anchor. Dedupe by (name, dates, days). Write sorted Excel as a local archive. Send email if SMTP configured.
+7. Each program's **Registration Status** is extracted from the row below the details (e.g., "Registration begins on 4/22/2026"). Programs are then **filtered to only those with "begins" or "opens"** in the registration status.
+8. If no programs match the registration filter, a "no new programs" email is sent instead of an empty list.
+9. Stop paginating when `has_next_page` reports no higher numeric anchor. Dedupe by (name, dates, days). Write sorted Excel as a local archive. Send email if SMTP configured.
 
 ## Email
 

@@ -10,7 +10,7 @@ from .config import TARGET_AGE
 
 COLUMNS = [
     "Program Name", "Category", "Age / Age Range",
-    "Date(s)", "Day(s)", "Opening", "Remaining", "URL",
+    "Date(s)", "Day(s)", "Opening", "Remaining", "URL", "Registration Status",
 ]
 
 PORTAL_ORIGIN = "https://jcrec.recdesk.com"
@@ -32,6 +32,14 @@ def _cell_value_after_label(tr, label: str) -> str:
             if small:
                 return _clean(small.get_text(" ", strip=True))
             return _clean(td.get_text(" ", strip=True).removeprefix(label).strip())
+    return ""
+
+
+def _extract_registration_status(tr) -> str:
+    """Extract registration status from a tr (e.g., 'Registration begins on 4/22/2026')."""
+    text = _clean(tr.get_text())
+    if "registration" in text.lower():
+        return text
     return ""
 
 
@@ -66,24 +74,30 @@ def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
             url = (PORTAL_ORIGIN + href) if href.startswith("/") else (href or "")
 
             detail_tr = None
+            reg_status_tr = None
             j = i + 1
             while j < len(children):
                 next_tr = children[j]
                 ncls = " ".join(next_tr.get("class", []))
                 if "sub-category-header" in ncls or next_tr.find("td", class_="category-header"):
                     break
+                reg_status_candidate = _extract_registration_status(next_tr)
+                if reg_status_candidate:
+                    reg_status_tr = next_tr
                 if "hidden-xs" in ncls:
                     detail_tr = next_tr
                     break
                 j += 1
 
-            ages = dates = days = opening = remaining = ""
+            ages = dates = days = opening = remaining = reg_status = ""
             if detail_tr is not None:
                 dates = _cell_value_after_label(detail_tr, "Dates")
                 days = _cell_value_after_label(detail_tr, "Days")
                 ages = _cell_value_after_label(detail_tr, "Ages")
                 opening = _cell_value_after_label(detail_tr, "Openings")
                 remaining = _cell_value_after_label(detail_tr, "Remaining")
+            if reg_status_tr is not None:
+                reg_status = _extract_registration_status(reg_status_tr)
 
             if not ages or ages.strip() in {"-", "N/A"}:
                 ages = extract_age_from_name(name) or ages
@@ -98,6 +112,7 @@ def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
                     "Opening": opening or "N/A",
                     "Remaining": remaining or "N/A",
                     "URL": url or "N/A",
+                    "Registration Status": reg_status or "N/A",
                 })
         i += 1
 

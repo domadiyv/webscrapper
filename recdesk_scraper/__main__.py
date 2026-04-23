@@ -30,6 +30,15 @@ def _dedupe(programs: list[dict]) -> list[dict]:
     return out
 
 
+def _filter_new_registrations(programs: list[dict]) -> list[dict]:
+    """Keep only programs with 'begins' or 'opens' in registration status."""
+    return [
+        p for p in programs
+        if any(keyword in p.get("Registration Status", "").lower()
+               for keyword in ("begins", "opens"))
+    ]
+
+
 async def run() -> None:
     log.info("=== RecDesk scraper started  target_age=%d ===", TARGET_AGE)
     html_pages = await fetch_all_html_pages()
@@ -46,15 +55,25 @@ async def run() -> None:
     if len(programs) != before:
         log.info("Removed %d duplicate row(s)", before - len(programs))
 
-    log.info("Total matching programs: %d", len(programs))
-    out = save_excel(programs)
-    print(f"\nDone. Output file: {out}")
-    print(f"Programs found for age {TARGET_AGE}: {len(programs)}")
+    before = len(programs)
+    programs = _filter_new_registrations(programs)
+    log.info("Filtered to %d programs with new registration openings (from %d total)", len(programs), before)
 
+    log.info("Total matching programs: %d", len(programs))
+
+    email_sent = False
     try:
-        send_email(programs)
+        email_sent = send_email(programs)
     except Exception as exc:
         log.error("Email failed: %s", exc)
+
+    if email_sent:
+        log.info("Email sent successfully; skipping Excel export")
+        print("\nEmail sent successfully. No Excel file saved.")
+    else:
+        out = save_excel(programs)
+        print(f"\nDone. Output file: {out}")
+        print(f"Programs found for age {TARGET_AGE}: {len(programs)}")
 
 
 if __name__ == "__main__":

@@ -26,11 +26,12 @@ def _sorted(programs: list[dict]) -> list[dict]:
 
 def _render_text(programs: list[dict]) -> str:
     if not programs:
-        return "No matching programs found today.\n"
-    lines = [f"RecDesk programs for age {TARGET_AGE} — {len(programs)} open.", ""]
+        return f"No new programs opening for registration today (age {TARGET_AGE}).\n"
+    lines = [f"New registration openings — {len(programs)} program(s) for age {TARGET_AGE}.", ""]
     for i, p in enumerate(_sorted(programs), 1):
         lines.append(
             f"{i}. {p['Program Name']}  [{p['Category']}]\n"
+            f"   {p.get('Registration Status', 'N/A')}\n"
             f"   Ages: {p['Age / Age Range']}  |  Dates: {p['Date(s)']}  |  "
             f"Days: {p['Day(s)']}  |  Openings: {p['Opening']} (Remaining: {p['Remaining']})\n"
             f"   {p.get('URL', '')}"
@@ -53,10 +54,15 @@ def _cell(p: dict, col: str) -> str:
 def _render_html(programs: list[dict]) -> str:
     count = len(programs)
     if count == 0:
-        return (
-            "<html><body style=\"font-family:Arial,sans-serif;\">"
-            "<p>No matching programs found today.</p></body></html>"
-        )
+        return f"""\
+<html>
+  <body style="font-family:Arial,Helvetica,sans-serif;color:#666;">
+    <h2 style="margin-bottom:4px;color:#999;">No New Registrations</h2>
+    <p>No programs are opening for registration today (age {TARGET_AGE}).</p>
+    <p style="color:#aaa;font-size:12px;">{datetime.now():%A, %B %d, %Y}</p>
+  </body>
+</html>
+"""
 
     header_cells = "".join(
         f'<th style="text-align:left;padding:8px 12px;border-bottom:2px solid #333;'
@@ -75,10 +81,9 @@ def _render_html(programs: list[dict]) -> str:
     return f"""\
 <html>
   <body style="font-family:Arial,Helvetica,sans-serif;color:#222;">
-    <h2 style="margin-bottom:4px;">RecDesk Programs — age {TARGET_AGE}</h2>
+    <h2 style="margin-bottom:4px;">New Registration Openings — age {TARGET_AGE}</h2>
     <p style="color:#666;margin-top:0;">
-      {count} open program{'s' if count != 1 else ''} ·
-      {datetime.now():%A, %B %d, %Y}
+      {count} program{'s' if count != 1 else ''} · {datetime.now():%A, %B %d, %Y}
     </p>
     <table style="border-collapse:collapse;">
       <thead><tr>{header_cells}</tr></thead>
