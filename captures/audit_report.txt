@@ -1,0 +1,288 @@
+====================================================================================================
+CAPTURE ENVIRONMENT
+====================================================================================================
+  captured at (UTC)   : 2026-09-15T12:36:19+00:00
+  captured at (local) : 2026-09-15T08:36:19-04:00
+  platform            : Windows-11-10.0.26200-SP0
+  python              : 3.14.6 (D:\Claude\webscrapper\.venv\Scripts\python.exe)
+  playwright          : 1.62.0
+
+  BASE_URL            : https://jcrec.recdesk.com/Community/Program
+  FILTER_API          : https://jcrec.recdesk.com/Community/Program/FilterPrograms
+  TARGET_AGE          : 8
+  MAX_PAGES           : 50
+  REGISTRATION_STATES : open,upcoming
+
+  pages fetched       : 3
+  audit exit code     : 0
+
+Reading 3 saved page(s) from D:\Claude\webscrapper\captures/
+
+====================================================================================================
+LIVE AUDIT â€” target age 8 | reporting states: open,upcoming
+====================================================================================================
+
+--- PAGE 1: 25 programs | has_next_page -> True
+  [drop] id=  6022  2026 Fall - Buddy Baseball | Ages 5-21 | College LL Fiel
+         cat=Adaptive Recreation  ages=5y - 21y     grades=N/A            rem=  FULL  state=waitlist  status=Wait list only
+         -> dropped: FULL
+  [drop] id=  6024  2026 Fall - Fall Adaptive Soccer @ Martucci | Ages 15â€“24
+         cat=Adaptive Recreation  ages=15y - 24y    grades=N/A            rem=    28  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '15y - 24y'
+  [KEEP] id=  6023  2026 Fall - Fall Adaptive Soccer @ Martucci | Ages 7â€“14 
+         cat=Adaptive Recreation  ages=7y - 14y     grades=N/A            rem=     9  state=open      status=Registration open
+         -> kept: ages '7y - 14y', state=open
+  [drop] id=  6021  Adult Fitness @ Bethune Center 18+ | M - 1              
+         cat=Adult                ages=18y          grades=N/A            rem=     8  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '18y'
+  [drop] id=  6025  Adult Fitness @ Bethune Center 18+ | M - 2              
+         cat=Adult                ages=18y          grades=N/A            rem=     9  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '18y'
+  [drop] id=  6026  Adult Fitness @ Bethune Center 18+ | M - 3              
+         cat=Adult                ages=18y          grades=N/A            rem=     9  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '18y'
+  [drop] id=  6047  2026 Fall - Home Run Derby @ Caven Point                
+         cat=Baseball             ages=11y - 12y    grades=N/A            rem=    36  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '11y - 12y'
+  [drop] id=  6050  2026 Fall - Home Run Derby @ Gateway Field              
+         cat=Baseball             ages=18y - 24y    grades=N/A            rem=    40  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '18y - 24y'
+  [drop] id=  6048  2026 Fall - Home Run Derby @ Pershing Field             
+         cat=Baseball             ages=13y - 14y    grades=N/A            rem=    37  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '13y - 14y'
+  [drop] id=  6049  2026 Fall - Home Run Derby @ Roberto Clemente Field @ 6t
+         cat=Baseball             ages=15y - 17y    grades=N/A            rem=    40  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '15y - 17y'
+  [drop] id=  6030  2026 Fall - BB Skills & Drills | Ages 12-14 | @ Bayside 
+         cat=Basketball           ages=12y - 14y    grades=N/A            rem=    46  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '12y - 14y'
+  [drop] id=  6032  2026 Fall - BB Skills & Drills | Ages 12-14 | @ Pershing
+         cat=Basketball           ages=12y - 14y    grades=N/A            rem=    51  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '12y - 14y'
+  [drop] id=  6028  2026 Fall - BB Skills & Drills | Ages 12-14 | Lincoln Pa
+         cat=Basketball           ages=12y - 14y    grades=N/A            rem=    53  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '12y - 14y'
+  [drop] id=  6014  2026 Fall - BB Skills & Drills | Ages 4-8 | @ Bayside | 
+         cat=Basketball           ages=4y - 8y      grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: FULL
+  [drop] id=  6020  2026 Fall - BB Skills & Drills | Ages 4-8 | @ Pershing |
+         cat=Basketball           ages=4y - 8y      grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: FULL
+  [drop] id=  6015  2026 Fall - BB Skills & Drills | Ages 4-8 | Lincoln Park
+         cat=Basketball           ages=4y - 8y      grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: FULL
+  [drop] id=  6029  2026 Fall - BB Skills & Drills | Ages 9-11 | @ Bayside |
+         cat=Basketball           ages=9y - 11y     grades=N/A            rem=    33  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '9y - 11y'
+  [drop] id=  6031  2026 Fall - BB Skills & Drills | Ages 9-11 | @ Pershing 
+         cat=Basketball           ages=9y - 11y     grades=N/A            rem=     8  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '9y - 11y'
+  [drop] id=  6027  2026 Fall - BB Skills & Drills | Ages 9-11 | Lincoln Par
+         cat=Basketball           ages=9y - 11y     grades=N/A            rem=    36  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '9y - 11y'
+  [drop] id=  6046  2026 Fall Adult - Co-Ed 40+ Basketball â€“ Fall League @ A
+         cat=Basketball           ages=40y          grades=N/A            rem=    91  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '40y'
+  [drop] id=  5990  2026 Fall Tournament - Back 2 School 3v3 BB | Ages 18-24
+         cat=Basketball           ages=18y - 24y    grades=N/A            rem=    12  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '18y - 24y'
+  [drop] id=  5989  2026 Fall Tournament - Back 2 School 3v3 BB | Grades 11-
+         cat=Basketball           ages=N/A          grades=11 - 12        rem=     6  state=open      status=Registration open
+         -> dropped: age 8 not eligible: grades '11 - 12' -> ages 16-18
+  [KEEP] id=  5985  2026 Fall Tournament - Back 2 School 3v3 BB | Grades 2-4
+         cat=Basketball           ages=N/A          grades=2 - 4          rem=    11  state=open      status=Registration open
+         -> kept: grades '2 - 4' -> ages 7-10, state=open
+  [drop] id=  5986  2026 Fall Tournament - Back 2 School 3v3 BB | Grades 5-6
+         cat=Basketball           ages=N/A          grades=5 - 6          rem=     8  state=open      status=Registration open
+         -> dropped: age 8 not eligible: grades '5 - 6' -> ages 10-12
+  [drop] id=  5987  2026 Fall Tournament - Back 2 School 3v3 BB | Grades 7-8
+         cat=Basketball           ages=N/A          grades=7 - 8          rem=     6  state=open      status=Registration open
+         -> dropped: age 8 not eligible: grades '7 - 8' -> ages 12-14
+
+--- PAGE 2: 25 programs | has_next_page -> True
+  [drop] id=  5988  2026 Fall Tournament - Back 2 School 3v3 BB | Grades 9-1
+         cat=Basketball           ages=N/A          grades=9 - 10         rem=     7  state=open      status=Registration open
+         -> dropped: age 8 not eligible: grades '9 - 10' -> ages 14-16
+  [drop] id=  5978  2026 Fall - Shoot 4 the Stars w/ Game Day 12-15 yr | T/T
+         cat=Beginner and Novice  ages=12y - 15y 11m grades=N/A            rem=    24  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '12y - 15y 11m'
+  [drop] id=  5976  2026 Fall - Shoot 4 the Stars w/ Game Day 6-8 yr | T/Th/
+         cat=Beginner and Novice  ages=6y - 8y 11m  grades=N/A            rem=  FULL  state=ended     status=Registration ended on 9/15/2026 8:
+         -> dropped: FULL
+  [drop] id=  5977  2026 Fall - Shoot 4 the Stars w/ Game Day 9-11 yr | T/Th
+         cat=Beginner and Novice  ages=9y - 11y 11m grades=N/A            rem=    10  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '9y - 11y 11m'
+  [drop] id=  5979  2026 Fall Soccer - Shoot 4 the Stars @ Martucci Ages 4-5
+         cat=Beginner and Novice  ages=4y - 5y 11m  grades=N/A            rem=  FULL  state=ended     status=Registration ended on 9/7/2026 8:0
+         -> dropped: age 8 not eligible: ages '4y - 5y 11m'
+  [drop] id=  5980  2026 Fall - Boxing @ MS #7 | 12â€“14 yrs | M/W            
+         cat=Boxing               ages=12y - 14y    grades=N/A            rem=    41  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '12y - 14y'
+  [drop] id=  5984  2026 Fall - Boxing @ MS #7 | 12â€“14 yrs | T/Th           
+         cat=Boxing               ages=12y - 14y    grades=N/A            rem=    45  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '12y - 14y'
+  [drop] id=  5991  2026 Fall - Boxing @ MS #7 | 15â€“24 yrs | M/W            
+         cat=Boxing               ages=15y - 24y    grades=N/A            rem=    47  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '15y - 24y'
+  [drop] id=  5992  2026 Fall - Boxing @ MS #7 | 15â€“24 yrs | T/Th           
+         cat=Boxing               ages=15y - 24y    grades=N/A            rem=    47  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '15y - 24y'
+  [KEEP] id=  5993  2026 Fall - Boxing @ MS #7 | 7â€“11 yrs | M/W             
+         cat=Boxing               ages=7y - 11y     grades=N/A            rem=    27  state=open      status=Registration open
+         -> kept: ages '7y - 11y', state=open
+  [KEEP] id=  5994  2026 Fall - Boxing @ MS #7 | 7â€“11 yrs | T/Th            
+         cat=Boxing               ages=7y - 11y     grades=N/A            rem=    32  state=open      status=Registration open
+         -> kept: ages '7y - 11y', state=open
+  [drop] id=  5983  2026 Jersey City - Jets Cheerleading @Caven Point LL Age
+         cat=Cheerleading         ages=10y - 14y 0m grades=N/A            rem=     7  state=ended     status=Registration ended on 9/1/2026
+         -> dropped: age 8 not eligible: ages '10y - 14y 0m'
+  [drop] id=  5982  2026 Jersey City - Jets Cheerleading @Caven Point LL Age
+         cat=Cheerleading         ages=7y - 9y      grades=N/A            rem=  FULL  state=ended     status=Registration ended on 8/27/2026
+         -> dropped: FULL
+  [drop] id=  6005  Fall 2026 - Cricket @ Mary Benson Park | 5-8 yrs | Fri  
+         cat=Cricket              ages=5y - 8y      grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: FULL
+  [drop] id=  6007  Fall 2026 - Cricket @ Mary Benson Park | 9-15 yrs | Fri 
+         cat=Cricket              ages=9y - 15y     grades=N/A            rem=     2  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '9y - 15y'
+  [drop] id=  6003  2026 Fall - Fall Into Dance | Ages 11-15 | @ Pershing Fi
+         cat=Dance                ages=11y - 15y    grades=N/A            rem=    18  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '11y - 15y'
+  [drop] id=  6002  2026 Fall - Fall Into Dance | Ages 7-10 | @ Pershing Fie
+         cat=Dance                ages=7y - 10y     grades=N/A            rem=  FULL  state=waitlist  status=Wait list only
+         -> dropped: FULL
+  [drop] id=  5481  2026 Fall - Flag Football @ Franco Field | 7-9 yrs |    
+         cat=Flag Football        ages=7y - 9y      grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: FULL
+  [drop] id=  5480  2026 Fall - Flag Football @ Franco Field |10 -13 yrs |  
+         cat=Flag Football        ages=10y - 13y    grades=N/A            rem=    23  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '10y - 13y'
+  [drop] id=  5971  2026 Season - Jets Tackle Football | U12 Jr. Varsity    
+         cat=Football             ages=11y - 12y    grades=N/A            rem=    30  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '11y - 12y'
+  [drop] id=  5589  Fall 2026 - Bully Proof | 7â€“14 yrs | @ Pershing Field | 
+         cat=Martial Arts         ages=7y - 14y     grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: FULL
+  [drop] id=  5588  Fall 2026 - Bully Proof | 7â€“14 yrs | @ Pershing Field | 
+         cat=Martial Arts         ages=7y - 14y     grades=N/A            rem=     1  state=offline   status=No online registration
+         -> dropped: registration state 'offline' (No online registration)
+  [drop] id=  6001  2026 Fall - Pickleball | Ages 11-15 | @ 16th St Park    
+         cat=Pickelball           ages=11y - 15y    grades=N/A            rem=    12  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '11y - 15y'
+  [drop] id=  6000  2026 Fall - Pickleball | Ages 7-10 | @ 16th St Park     
+         cat=Pickelball           ages=7y - 10y     grades=N/A            rem=  FULL  state=waitlist  status=Wait list only
+         -> dropped: FULL
+  [KEEP] id=  6004  Fall 2026 - Rugby @ Pershing Field | 7-15 yrs | Th      
+         cat=Rugby                ages=7y - 15y     grades=N/A            rem=    38  state=open      status=Registration open
+         -> kept: ages '7y - 15y', state=open
+
+--- PAGE 3: 22 programs | has_next_page -> False
+  [drop] id=  6012  Fall 2026 - Small Sided Soccer @ Pershing | 8â€“12 yrs | W
+         cat=Soccer               ages=8y - 12y     grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: FULL
+  [drop] id=  6011  Fall 2026 - Soccer Ball Mastery @ Audubon Park | 8â€“11 yr
+         cat=Soccer               ages=5y - 7y      grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: age 8 not eligible: ages '5y - 7y'
+  [drop] id=  6006  Fall 2026 - Soccer Ball Mastery @ Gateway Field | 5â€“7 yr
+         cat=Soccer               ages=5y - 7y      grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: age 8 not eligible: ages '5y - 7y'
+  [drop] id=  6008  Fall 2026 - Soccer Ball Mastery @ Gateway Field | 8â€“11 y
+         cat=Soccer               ages=8y - 11y     grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: FULL
+  [drop] id=  6009  Fall 2026 - Soccer Ball Mastery @ Pershing | 5â€“7 yrs | W
+         cat=Soccer               ages=5y - 7y      grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: age 8 not eligible: ages '5y - 7y'
+  [drop] id=  6010  Fall 2026 - Soccer Ball Mastery @ Pershing | 8 â€“11 yrs |
+         cat=Soccer               ages=8y - 11y     grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: FULL
+  [drop] id=  5996  2026 Fall - Track @ Lincoln Park | 5â€“9 yrs| T/Th        
+         cat=Track and Field      ages=5y - 9y      grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: FULL
+  [drop] id=  5995  2026 Fall - Track @ Lincoln Park | 5â€“9 yrs| M/Wed       
+         cat=Track and Field      ages=5y - 9y      grades=N/A            rem=  FULL  state=full      status=Full
+         -> dropped: FULL
+  [drop] id=  5998  2026 Fall - Track @ Lincoln Park |10â€“14 yrs| M/Wed      
+         cat=Track and Field      ages=10y - 14y    grades=N/A            rem=    26  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '10y - 14y'
+  [drop] id=  5997  2026 Fall - Track @ Lincoln Park |10â€“14 yrs| T/Thu      
+         cat=Track and Field      ages=10y - 14y    grades=N/A            rem=    38  state=open      status=Registration open
+         -> dropped: age 8 not eligible: ages '10y - 14y'
+  [drop] id=  5999  JC Panthers Track Team                                  
+         cat=Track and Field      ages=N/A          grades=N/A            rem=   n/a  state=offline   status=No online registration
+         -> dropped: registration state 'offline' (No online registration)
+  [drop] id=  5942  CIFA Boys Select - Advanced Soccer U12 (Mon/Wed/Fri)    
+         cat=Travel Soccer        ages=9y - 12y     grades=N/A            rem=  FULL  state=offline   status=No online registration
+         -> dropped: age 8 not eligible: ages '9y - 12y'
+  [drop] id=  5943  CIFA Boys Select - Advanced Soccer U12(B) (Tues/Thurs)  
+         cat=Travel Soccer        ages=9y - 12y     grades=N/A            rem=  FULL  state=offline   status=No online registration
+         -> dropped: age 8 not eligible: ages '9y - 12y'
+  [drop] id=  5941  CIFA Boys Select - Advanced Soccer U13 (Mon/Wed/Fri)    
+         cat=Travel Soccer        ages=11y - 13y    grades=N/A            rem=  FULL  state=offline   status=No online registration
+         -> dropped: age 8 not eligible: ages '11y - 13y'
+  [drop] id=  5940  CIFA Boys Select - Advanced Soccer U14 (Mon/Wed/Fri)    
+         cat=Travel Soccer        ages=12y - 14y    grades=N/A            rem=  FULL  state=offline   status=No online registration
+         -> dropped: age 8 not eligible: ages '12y - 14y'
+  [drop] id=  5939  CIFA Boys Select - Advanced Soccer U15 (Mon/Wed/Fri)    
+         cat=Travel Soccer        ages=13y - 15y    grades=N/A            rem=  FULL  state=offline   status=No online registration
+         -> dropped: age 8 not eligible: ages '13y - 15y'
+  [drop] id=  5502  CIFA Boys Select - Advanced Soccer U17 (Tues/Thurs)     
+         cat=Travel Soccer        ages=14y - 17y    grades=N/A            rem=     3  state=offline   status=No online registration
+         -> dropped: age 8 not eligible: ages '14y - 17y'
+  [drop] id=  5974  CIFA Boys Select - Advanced Soccer U8 (Tues/Thurs)      
+         cat=Travel Soccer        ages=6y - 9y      grades=N/A            rem=  FULL  state=offline   status=No online registration
+         -> dropped: FULL
+  [drop] id=  5946  CIFA Co-Ed Boys Sele - Advanced Soccer U9 (B) (Tues/Thur
+         cat=Travel Soccer        ages=7y - 9y      grades=N/A            rem=  FULL  state=offline   status=No online registration
+         -> dropped: FULL
+  [drop] id=  5944  CIFA Co-Ed Select - Advanced Soccer U9 (Tues/Thurs)     
+         cat=Travel Soccer        ages=7y - 9y      grades=N/A            rem=  FULL  state=offline   status=No online registration
+         -> dropped: FULL
+  [drop] id=  5945  CIFA Girls Select - Advanced Soccer U15 (Mon/Wed/Fri)   
+         cat=Travel Soccer        ages=13y - 15y    grades=N/A            rem=     7  state=offline   status=No online registration
+         -> dropped: age 8 not eligible: ages '13y - 15y'
+  [drop] id=  5975  CIFA Girls Select - Advanced Soccer U8 (Tues/Thurs)     
+         cat=Travel Soccer        ages=6y - 9y      grades=N/A            rem=  FULL  state=offline   status=No online registration
+         -> dropped: FULL
+
+====================================================================================================
+TOTALS â€” 72 programs across 3 page(s)
+====================================================================================================
+  registration states : {'waitlist': 3, 'open': 38, 'full': 14, 'ended': 4, 'offline': 13}
+  age 8 matches      : 27
+  ...and not FULL     : 7
+  ...after dedupe     : 7
+  ...after reg filter : 5   <- this is what gets emailed
+
+====================================================================================================
+EMAIL WOULD CONTAIN 5 PROGRAM(S)
+====================================================================================================
+  1. 2026 Fall - Boxing @ MS #7 | 7â€“11 yrs | M/W
+     Boxing | ages 7y - 11y | 9/14/2026 - 11/18/2026 | Mon, Wed
+     Registration open | remaining 27
+     https://jcrec.recdesk.com/Community/Program/Detail?programId=5993
+  2. 2026 Fall - Boxing @ MS #7 | 7â€“11 yrs | T/Th
+     Boxing | ages 7y - 11y | 9/15/2026 - 11/19/2026 | Tue, Thu
+     Registration open | remaining 32
+     https://jcrec.recdesk.com/Community/Program/Detail?programId=5994
+  3. 2026 Fall - Fall Adaptive Soccer @ Martucci | Ages 7â€“14
+     Adaptive Recreation | ages 7y - 14y | 9/12/2026 - 11/14/2026 | Sat
+     Registration open | remaining 9
+     https://jcrec.recdesk.com/Community/Program/Detail?programId=6023
+  4. 2026 Fall Tournament - Back 2 School 3v3 BB | Grades 2-4 | @ Lincoln Park
+     Basketball | ages N/A | 9/19/2026 | Sat
+     Registration open | remaining 11
+     https://jcrec.recdesk.com/Community/Program/Detail?programId=5985
+  5. Fall 2026 - Rugby @ Pershing Field | 7-15 yrs | Th
+     Rugby | ages 7y - 15y | 9/17/2026 - 11/5/2026 | Thu
+     Registration open | remaining 38
+     https://jcrec.recdesk.com/Community/Program/Detail?programId=6004
+
+====================================================================================================
+CHECKS
+====================================================================================================
+  OK   38 program(s) classified 'open' (Register Now button present)
+  OK   every program got a registration state
+  OK   every program has a programId
+  note 0 program(s) have a future 'Registration begins/opens' badge
+
+  All checks passed.

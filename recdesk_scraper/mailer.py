@@ -29,10 +29,16 @@ def _render_text(programs: list[dict]) -> str:
         return f"No new programs opening for registration today (age {TARGET_AGE}).\n"
     lines = [f"New registration openings — {len(programs)} program(s) for age {TARGET_AGE}.", ""]
     for i, p in enumerate(_sorted(programs), 1):
+        # Grade-based programs leave Ages unset, so name the grade instead of
+        # printing a bare "N/A" that hides why the program qualified.
+        grades = p.get("Grade(s)", "N/A")
+        eligibility = f"Ages: {p['Age / Age Range']}"
+        if grades and grades != "N/A":
+            eligibility += f"  |  Grades: {grades}"
         lines.append(
             f"{i}. {p['Program Name']}  [{p['Category']}]\n"
             f"   {p.get('Registration Status', 'N/A')}\n"
-            f"   Ages: {p['Age / Age Range']}  |  Dates: {p['Date(s)']}  |  "
+            f"   {eligibility}  |  Dates: {p['Date(s)']}  |  "
             f"Days: {p['Day(s)']}  |  Openings: {p['Opening']} (Remaining: {p['Remaining']})\n"
             f"   {p.get('URL', '')}"
         )
