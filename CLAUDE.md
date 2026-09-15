@@ -62,9 +62,10 @@ Output: `output/programs_age<AGE>_YYYYMMDD_HHMMSS.xlsx`.
 4. Each program's Ages cell (`"7y - 14y"`) is tested with `age_includes`. When the cell is empty/dashed, fall back to `extract_age_from_name` which extracts `"Ages 7-11"`-style phrases from the title.
 5. **FULL programs are skipped** — if the Remaining cell contains the `FULL` badge, the program is excluded.
 6. Each program's registration URL (`…/Community/Program/Detail?programId=…`) is captured as an absolute link.
-7. Each program's **Registration Status** is extracted from the row below the details (e.g., "Registration begins on 4/22/2026"). Programs are then **filtered to only those with "begins" or "opens"** in the registration status.
-8. If no programs match the registration filter, a "no new programs" email is sent instead of an empty list.
-9. Stop paginating when `has_next_page` reports no higher numeric anchor. Dedupe by (name, dates, days). Write sorted Excel as a local archive. Send email if SMTP configured.
+7. Each program's **registration state** is classified. The portal renders a status-badge row (which sits *above* the detail row) **only for non-default states** — `Registration ended on <date>`, `Registration begins on <date>`, `No online registration`. A program that is simply open right now has **no badge at all**; its only signal is the `Register Now` button in the detail row's trailing cell. States: `open`, `upcoming`, `waitlist`, `ended`, `offline`, `unknown`. Never filter on the status *text* alone — open programs have none.
+8. Programs are filtered to the states listed in `REGISTRATION_STATES` (default `open,upcoming`).
+9. If no programs match, a "no new programs" email is sent instead of an empty list.
+10. Stop paginating when `has_next_page` reports the pager's `next` control disabled (falling back to the max numeric anchor). Dedupe by **programId** — the portal lists distinct programs that share a name, dates and days, so a (name, dates, days) key silently drops real programs. Write sorted Excel as a local archive. Send email if SMTP configured.
 
 ## Email
 
@@ -73,6 +74,8 @@ Output: `output/programs_age<AGE>_YYYYMMDD_HHMMSS.xlsx`.
 - **HTML** part: styled table where each Program Name is a clickable link to the RecDesk registration page.
 
 Config is loaded from `.env` (via `python-dotenv`) or environment. Required: `SMTP_HOST`, `SMTP_USER`, `SMTP_PASSWORD`, `EMAIL_TO`. Optional: `SMTP_PORT` (default 587), `SMTP_TLS` (default true), `EMAIL_FROM` (defaults to `SMTP_USER`). If any required var is missing, email is skipped and the run still succeeds.
+
+Scraper tuning env vars: `TARGET_AGE` (default 8), `MAX_PAGES` (default 50), `REGISTRATION_STATES` (default `open,upcoming`; set to `upcoming` alone to be notified only about registrations that have not started yet).
 
 Gmail requires an **App Password** (not the account password): https://support.google.com/accounts/answer/185833
 

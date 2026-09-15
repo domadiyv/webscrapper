@@ -20,6 +20,16 @@ FILTER_API = "https://jcrec.recdesk.com/Community/Program/FilterPrograms"
 TARGET_AGE = int(os.environ.get("TARGET_AGE", "8"))
 MAX_PAGES = int(os.environ.get("MAX_PAGES", "50"))
 
+# Which registration states to report on. The portal renders a status badge only
+# for non-default states, so "open" (a plain "Register Now" button, no badge) has
+# to be listed explicitly or every currently-registerable program is discarded.
+# Valid values: open, upcoming, waitlist, ended, offline, unknown.
+REGISTRATION_STATES = frozenset(
+    s.strip().lower()
+    for s in os.environ.get("REGISTRATION_STATES", "open,upcoming").split(",")
+    if s.strip()
+)
+
 
 @dataclass(frozen=True)
 class EmailConfig:

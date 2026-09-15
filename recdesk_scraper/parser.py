@@ -15,6 +15,14 @@ COLUMNS = [
 
 PORTAL_ORIGIN = "https://jcrec.recdesk.com"
 
+# Registration states derived from the portal markup.
+STATE_OPEN = "open"          # "Register Now" button — registerable right now
+STATE_UPCOMING = "upcoming"  # badge "Registration begins/opens on <date>"
+STATE_WAITLIST = "waitlist"  # "Wait List" button — full but joinable
+STATE_ENDED = "ended"        # badge "Registration ended/closed on <date>"
+STATE_OFFLINE = "offline"    # badge "No online registration"
+STATE_UNKNOWN = "unknown"    # no badge and no action button
+
 
 def _is_full(remaining: str) -> bool:
     return "full" in (remaining or "").lower()
@@ -35,12 +43,52 @@ def _cell_value_after_label(tr, label: str) -> str:
     return ""
 
 
-def _extract_registration_status(tr) -> str:
-    """Extract registration status from a tr (e.g., 'Registration begins on 4/22/2026')."""
-    text = _clean(tr.get_text())
-    if "registration" in text.lower():
-        return text
+def _registration_badge(tr) -> str:
+    """Text of the status badge row, e.g. 'Registration ended on 4/3/2026'.
+
+    The portal only renders this row for non-default states; a program that is
+    simply open for registration has no badge at all.
+    """
+    badge = tr.find("div", class_="label")
+    if badge:
+        text = _clean(badge.get_text(" ", strip=True))
+        if text:
+            return text
+    text = _clean(tr.get_text(" ", strip=True))
+    return text if "registration" in text.lower() else ""
+
+
+def _action_label(detail_tr) -> str:
+    """Text of the action button in the trailing cell ('Register Now' / 'Wait List')."""
+    if detail_tr is None:
+        return ""
+    button = detail_tr.find("button")
+    if button:
+        return _clean(button.get_text(" ", strip=True))
     return ""
+
+
+def _classify_registration(badge: str, action: str) -> tuple[str, str]:
+    """Return (state, human-readable status) for a program.
+
+    `badge` is the status-badge text (may be empty), `action` the button label.
+    """
+    low = badge.lower()
+    if badge:
+        if "begin" in low or "open" in low or "start" in low:
+            return STATE_UPCOMING, badge
+        if "end" in low or "close" in low:
+            return STATE_ENDED, badge
+        if "no online registration" in low:
+            return STATE_OFFLINE, badge
+
+    action_low = action.lower()
+    if "register" in action_low:
+        return STATE_OPEN, "Registration open"
+    if "wait list" in action_low or "waitlist" in action_low:
+        return STATE_WAITLIST, "Wait list only"
+
+    return (STATE_UNKNOWN, badge) if badge else (STATE_UNKNOWN, "")
 
 
 def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
@@ -73,31 +121,33 @@ def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
             href = link.get("href", "") if link else ""
             url = (PORTAL_ORIGIN + href) if href.startswith("/") else (href or "")
 
+            # Scan the whole block belonging to this program. The badge row sits
+            # between the name row and the detail row, so we must not stop at the
+            # first `hidden-xs` row before having looked at everything.
             detail_tr = None
-            reg_status_tr = None
+            badge = ""
             j = i + 1
             while j < len(children):
                 next_tr = children[j]
                 ncls = " ".join(next_tr.get("class", []))
                 if "sub-category-header" in ncls or next_tr.find("td", class_="category-header"):
                     break
-                reg_status_candidate = _extract_registration_status(next_tr)
-                if reg_status_candidate:
-                    reg_status_tr = next_tr
                 if "hidden-xs" in ncls:
-                    detail_tr = next_tr
-                    break
+                    if detail_tr is None:
+                        detail_tr = next_tr
+                elif "visible-xs" not in ncls and not badge:
+                    badge = _registration_badge(next_tr)
                 j += 1
 
-            ages = dates = days = opening = remaining = reg_status = ""
+            ages = dates = days = opening = remaining = ""
             if detail_tr is not None:
                 dates = _cell_value_after_label(detail_tr, "Dates")
                 days = _cell_value_after_label(detail_tr, "Days")
                 ages = _cell_value_after_label(detail_tr, "Ages")
                 opening = _cell_value_after_label(detail_tr, "Openings")
                 remaining = _cell_value_after_label(detail_tr, "Remaining")
-            if reg_status_tr is not None:
-                reg_status = _extract_registration_status(reg_status_tr)
+
+            state, reg_status = _classify_registration(badge, _action_label(detail_tr))
 
             if not ages or ages.strip() in {"-", "N/A"}:
                 ages = extract_age_from_name(name) or ages
@@ -113,6 +163,9 @@ def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
                     "Remaining": remaining or "N/A",
                     "URL": url or "N/A",
                     "Registration Status": reg_status or "N/A",
+                    # Not part of COLUMNS — used for filtering, dropped from output.
+                    "Registration State": state,
+                    "Program Id": re.search(r"programId=(\d+)", href).group(1) if href and re.search(r"programId=(\d+)", href) else "",
                 })
         i += 1
 
@@ -120,11 +173,26 @@ def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
 
 
 def has_next_page(html: str, current_page: int) -> bool:
-    """Return True if pagination links to a page > current_page."""
+    """Return True if there is a page after `current_page`.
+
+    Prefers the pager's own "next" control, which stays correct even when the
+    portal renders a windowed page list (1 2 3 … 9) rather than every number.
+    """
     soup = BeautifulSoup(html, "html.parser")
     pagination = soup.select_one("ul.pagination, .pagination")
     if not pagination:
         return False
+
+    next_link = pagination.find(id="next") or pagination.find(class_="page-next")
+    if next_link is not None:
+        parent_classes = " ".join(next_link.parent.get("class", [])) if next_link.parent else ""
+        disabled = (
+            "disabled" in parent_classes
+            or "disabled" in " ".join(next_link.get("class", []))
+            or str(next_link.get("aria-disabled", "")).lower() == "true"
+        )
+        return not disabled
+
     nums = [
         int(_clean(a.get_text())) for a in pagination.find_all("a")
         if _clean(a.get_text()).isdigit()
