@@ -21,7 +21,8 @@ STATE_UPCOMING = "upcoming"  # badge "Registration begins/opens on <date>"
 STATE_WAITLIST = "waitlist"  # "Wait List" button — full but joinable
 STATE_ENDED = "ended"        # badge "Registration ended/closed on <date>"
 STATE_OFFLINE = "offline"    # badge "No online registration"
-STATE_UNKNOWN = "unknown"    # no badge and no action button
+STATE_FULL = "full"          # no badge, no button, Remaining shows FULL
+STATE_UNKNOWN = "unknown"    # nothing recognisable — markup probably changed
 
 
 def _is_full(remaining: str) -> bool:
@@ -68,10 +69,11 @@ def _action_label(detail_tr) -> str:
     return ""
 
 
-def _classify_registration(badge: str, action: str) -> tuple[str, str]:
+def _classify_registration(badge: str, action: str, remaining: str = "") -> tuple[str, str]:
     """Return (state, human-readable status) for a program.
 
-    `badge` is the status-badge text (may be empty), `action` the button label.
+    `badge` is the status-badge text (may be empty), `action` the button label,
+    `remaining` the Remaining cell. Only `unknown` means "markup not recognised".
     """
     low = badge.lower()
     if badge:
@@ -88,11 +90,19 @@ def _classify_registration(badge: str, action: str) -> tuple[str, str]:
     if "wait list" in action_low or "waitlist" in action_low:
         return STATE_WAITLIST, "Wait list only"
 
+    # Full with no waitlist button: the portal renders an empty action cell.
+    if _is_full(remaining):
+        return STATE_FULL, "Full"
+
     return (STATE_UNKNOWN, badge) if badge else (STATE_UNKNOWN, "")
 
 
-def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
-    """Parse a FilterPrograms HTML response and return matching programs."""
+def extract_programs(html: str) -> list[dict]:
+    """Every program row on the page, with no age/FULL filtering applied.
+
+    `parse_programs_html` filters this. Audit tooling uses it directly so that
+    what it reports is the same extraction production actually runs.
+    """
     soup = BeautifulSoup(html, "html.parser")
     tbody = soup.select_one("table.table-vcenter > tbody")
     if not tbody:
@@ -147,13 +157,13 @@ def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
                 opening = _cell_value_after_label(detail_tr, "Openings")
                 remaining = _cell_value_after_label(detail_tr, "Remaining")
 
-            state, reg_status = _classify_registration(badge, _action_label(detail_tr))
+            state, reg_status = _classify_registration(
+                badge, _action_label(detail_tr), remaining)
 
             if not ages or ages.strip() in {"-", "N/A"}:
                 ages = extract_age_from_name(name) or ages
 
-            if age_includes(ages, target_age) and not _is_full(remaining):
-                results.append({
+            results.append({
                     "Program Name": name,
                     "Category": current_category,
                     "Age / Age Range": ages or "N/A",
@@ -166,10 +176,18 @@ def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
                     # Not part of COLUMNS — used for filtering, dropped from output.
                     "Registration State": state,
                     "Program Id": re.search(r"programId=(\d+)", href).group(1) if href and re.search(r"programId=(\d+)", href) else "",
-                })
+            })
         i += 1
 
     return results
+
+
+def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
+    """Parse a FilterPrograms HTML response and return age-matching, non-FULL programs."""
+    return [
+        p for p in extract_programs(html)
+        if age_includes(p["Age / Age Range"], target_age) and not _is_full(p["Remaining"])
+    ]
 
 
 def has_next_page(html: str, current_page: int) -> bool:

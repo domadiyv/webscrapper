@@ -11,6 +11,7 @@ import pytest
 from recdesk_scraper.__main__ import _dedupe, _filter_new_registrations
 from recdesk_scraper.parser import (
     STATE_ENDED,
+    STATE_FULL,
     STATE_OFFLINE,
     STATE_OPEN,
     STATE_UPCOMING,
@@ -38,18 +39,22 @@ def parsed():
 # Registration state classification
 # --------------------------------------------------------------------------
 
-@pytest.mark.parametrize("badge,action,expected", [
+@pytest.mark.parametrize("badge,action,remaining,expected", [
     # The portal renders NO badge for an open program — only the button.
-    ("",                                   "Register Now",            STATE_OPEN),
-    ("",                                   "Wait List (opens a dialog)", STATE_WAITLIST),
-    ("Registration begins on 4/22/2026",   "",                        STATE_UPCOMING),
-    ("Registration opens on 4/22/2026",    "",                        STATE_UPCOMING),
-    ("Registration ended on 4/3/2026",     "",                        STATE_ENDED),
-    ("No online registration",             "",                        STATE_OFFLINE),
+    ("",                                 "Register Now",               "24",   STATE_OPEN),
+    ("",                                 "Wait List (opens a dialog)", "FULL", STATE_WAITLIST),
+    ("Registration begins on 4/22/2026", "",                           "20",   STATE_UPCOMING),
+    ("Registration opens on 4/22/2026",  "",                           "20",   STATE_UPCOMING),
+    ("Registration ended on 4/3/2026",   "",                           "12",   STATE_ENDED),
+    ("No online registration",           "",                           "8",    STATE_OFFLINE),
+    # Full with no waitlist button — an empty action cell, not a parse failure.
+    ("",                                 "",                           "FULL", STATE_FULL),
+    # Nothing recognisable at all -> unknown, which the audit treats as a red flag.
+    ("",                                 "",                           "10",   "unknown"),
 ])
-def test_classify_registration(badge, action, expected):
-    state, _ = _classify_registration(badge, action)
-    assert state == expected, f"{badge!r}/{action!r} -> {state!r}"
+def test_classify_registration(badge, action, remaining, expected):
+    state, _ = _classify_registration(badge, action, remaining)
+    assert state == expected, f"{badge!r}/{action!r}/{remaining!r} -> {state!r}"
 
 
 def test_open_programs_get_a_state_not_a_blank_status(parsed):

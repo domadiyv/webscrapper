@@ -89,6 +89,25 @@ Gmail requires an **App Password** (not the account password): https://support.g
 
 `setup.sh` registers `0 21 * * * run.sh` on Linux/macOS. `run.sh` activates the venv and invokes `python -m recdesk_scraper`, logging to `logs/scraper_YYYYMMDD_HHMMSS.log`. Windows users should wire this up via Task Scheduler manually.
 
+## Verifying against the live portal
+
+`scripts/verify_live.py` audits the scraper program by program against the real
+site. It prints every program the portal lists with its extracted fields, its
+registration state, and the exact reason it was kept or dropped — then runs a set
+of checks and exits non-zero if anything looks wrong (nothing classified `open`,
+programs it could not classify, or age-eligible programs that all vanish at the
+registration filter — the signature of the bug that silenced the report).
+
+```bash
+python scripts/verify_live.py                       # hit the live portal
+python scripts/verify_live.py --save captures/      # ...and keep the raw HTML
+python scripts/verify_live.py --from tests/fixtures # offline re-run
+python scripts/verify_live.py --age 10              # audit a different age
+```
+
+Because it uses `parser.extract_programs` — the same extraction production runs —
+the audit cannot drift from the real scraper.
+
 ## Regenerating test fixtures
 
 If the portal markup changes, re-run `scripts/probe3.py` (hits FilterPrograms for 3 pages) and move the captured HTML into `tests/fixtures/`.
