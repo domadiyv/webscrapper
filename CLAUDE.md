@@ -98,6 +98,24 @@ of checks and exits non-zero if anything looks wrong (nothing classified `open`,
 programs it could not classify, or age-eligible programs that all vanish at the
 registration filter — the signature of the bug that silenced the report).
 
+### One-command live capture
+
+`scripts/capture_live.py` fetches the live portal, saves the raw HTML to
+`captures/`, runs the audit over it and writes `captures/audit_report.txt`.
+`captures/` is tracked on purpose — commit it and the exact live response can be
+replayed anywhere with `verify_live.py --from captures`, no network needed.
+
+```bash
+bash run_live_test.sh          # macOS/Linux — bootstraps the venv, then captures
+.\run_live_test.ps1            # Windows PowerShell — same
+python scripts/capture_live.py # if the venv is already set up
+```
+
+Exit codes: 0 healthy, 1 an audit check failed, 2 the fetch itself failed
+(the script names the cause — missing browser, DNS, proxy/firewall).
+
+### Manual audit
+
 ```bash
 python scripts/verify_live.py                       # hit the live portal
 python scripts/verify_live.py --save captures/      # ...and keep the raw HTML
