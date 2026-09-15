@@ -5,11 +5,17 @@ import re
 
 from bs4 import BeautifulSoup
 
-from .age import age_includes, extract_age_from_name
+from .age import (
+    age_includes,
+    extract_age_from_name,
+    grade_age_range,
+    grade_bounds,
+    has_age_info,
+)
 from .config import TARGET_AGE
 
 COLUMNS = [
-    "Program Name", "Category", "Age / Age Range",
+    "Program Name", "Category", "Age / Age Range", "Grade(s)",
     "Date(s)", "Day(s)", "Opening", "Remaining", "URL", "Registration Status",
 ]
 
@@ -149,24 +155,31 @@ def extract_programs(html: str) -> list[dict]:
                     badge = _registration_badge(next_tr)
                 j += 1
 
-            ages = dates = days = opening = remaining = ""
+            ages = grades = dates = days = opening = remaining = ""
             if detail_tr is not None:
                 dates = _cell_value_after_label(detail_tr, "Dates")
                 days = _cell_value_after_label(detail_tr, "Days")
                 ages = _cell_value_after_label(detail_tr, "Ages")
+                grades = _cell_value_after_label(detail_tr, "Grades")
                 opening = _cell_value_after_label(detail_tr, "Openings")
                 remaining = _cell_value_after_label(detail_tr, "Remaining")
 
             state, reg_status = _classify_registration(
                 badge, _action_label(detail_tr), remaining)
 
-            if not ages or ages.strip() in {"-", "N/A"}:
-                ages = extract_age_from_name(name) or ages
+            # The portal writes "- Not specified" for an unrestricted age, so
+            # test for a usable age rather than for an empty-looking cell, and
+            # normalise its placeholder to the "N/A" used everywhere else.
+            if not has_age_info(ages):
+                ages = extract_age_from_name(name) or ""
+            if grade_bounds(grades) is None:
+                grades = ""
 
             results.append({
                     "Program Name": name,
                     "Category": current_category,
                     "Age / Age Range": ages or "N/A",
+                    "Grade(s)": grades or "N/A",
                     "Date(s)": dates or "N/A",
                     "Day(s)": days or "N/A",
                     "Opening": opening or "N/A",
@@ -182,11 +195,40 @@ def extract_programs(html: str) -> list[dict]:
     return results
 
 
+def age_eligible(program: dict, target_age: int = TARGET_AGE) -> tuple[bool, str]:
+    """Return (eligible, reason) for one program at `target_age`.
+
+    The portal restricts a program by age *or* by grade, never reliably by both:
+    a grade-based program leaves Ages as "- Not specified" and vice versa. Its own
+    age filter honours all three cases, so matching on the Ages cell alone silently
+    drops every grade-based program. Precedence:
+
+    1. a usable Ages cell (including one recovered from the program title),
+    2. otherwise the Grades cell, mapped to the ages that attend those grades,
+    3. otherwise the program carries no age restriction and is open to anyone —
+       which is how the portal itself treats it.
+
+    Production and `scripts/verify_live.py` both call this, so the audit cannot
+    drift from the filtering that actually runs.
+    """
+    ages = program.get("Age / Age Range", "")
+    if has_age_info(ages):
+        return age_includes(ages, target_age), f"ages {ages!r}"
+
+    grades = program.get("Grade(s)", "")
+    span = grade_age_range(grades)
+    if span is not None:
+        lo, hi = span
+        return lo <= target_age <= hi, f"grades {grades!r} -> ages {lo}-{hi}"
+
+    return True, "no age or grade restriction"
+
+
 def parse_programs_html(html: str, target_age: int = TARGET_AGE) -> list[dict]:
     """Parse a FilterPrograms HTML response and return age-matching, non-FULL programs."""
     return [
         p for p in extract_programs(html)
-        if age_includes(p["Age / Age Range"], target_age) and not _is_full(p["Remaining"])
+        if age_eligible(p, target_age)[0] and not _is_full(p["Remaining"])
     ]
 
 

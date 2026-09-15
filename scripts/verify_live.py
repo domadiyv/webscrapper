@@ -22,12 +22,12 @@ from pathlib import Path
 
 sys.path.insert(0, str(Path(__file__).resolve().parent.parent))
 
-from recdesk_scraper.age import age_includes
 from recdesk_scraper.config import REGISTRATION_STATES, TARGET_AGE
 from recdesk_scraper.parser import (
     STATE_OPEN,
     STATE_UPCOMING,
     _is_full,
+    age_eligible,
     extract_programs,
     has_next_page,
 )
@@ -38,13 +38,14 @@ BAR = "=" * 100
 
 def _verdict(p: dict, target_age: int) -> tuple[bool, str]:
     """Return (kept, reason) for one program, mirroring the production pipeline."""
-    if not age_includes(p["Age / Age Range"], target_age):
-        return False, f"age {target_age} not in {p['Age / Age Range']!r}"
+    eligible, why = age_eligible(p, target_age)
+    if not eligible:
+        return False, f"age {target_age} not eligible: {why}"
     if _is_full(p["Remaining"]):
         return False, "FULL"
     if p["Registration State"] not in REGISTRATION_STATES:
         return False, f"registration state {p['Registration State']!r} ({p['Registration Status']})"
-    return True, f"state={p['Registration State']}"
+    return True, f"{why}, state={p['Registration State']}"
 
 
 async def _load_live(save_dir: Path | None) -> list[str]:
@@ -89,6 +90,7 @@ def main() -> int:
             kept, why = _verdict(p, args.age)
             print(f"  [{'KEEP' if kept else 'drop'}] id={p['Program Id']:>6}  {p['Program Name'][:56]:56}")
             print(f"         cat={p['Category'][:20]:20} ages={p['Age / Age Range']:12} "
+                  f"grades={p.get('Grade(s)', 'N/A')[:14]:14} "
                   f"rem={p['Remaining']:>6}  state={p['Registration State']:9} "
                   f"status={p['Registration Status'][:34]}")
             print(f"         -> {'kept: ' if kept else 'dropped: '}{why}")
@@ -97,7 +99,7 @@ def main() -> int:
     print(f"TOTALS — {len(every)} programs across {len(pages)} page(s)")
     print(BAR)
     print("  registration states :", dict(Counter(p["Registration State"] for p in every)))
-    age_ok = [p for p in every if age_includes(p["Age / Age Range"], args.age)]
+    age_ok = [p for p in every if age_eligible(p, args.age)[0]]
     not_full = [p for p in age_ok if not _is_full(p["Remaining"])]
     print(f"  age {args.age} matches      : {len(age_ok)}")
     print(f"  ...and not FULL     : {len(not_full)}")

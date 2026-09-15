@@ -7,8 +7,9 @@ Guidance for Claude Code when working in this repository.
 ```
 recdesk_scraper/       package — one module per responsibility
   config.py            env + .env loading, paths, EmailConfig
-  age.py               age_includes, extract_age_from_name
-  parser.py            parse_programs_html, has_next_page, COLUMNS
+  age.py               age_includes, grade_bounds/grade_age_range/grade_includes,
+                       has_age_info, extract_age_from_name
+  parser.py            parse_programs_html, age_eligible, has_next_page, COLUMNS
   fetcher.py           Playwright cookie load + FilterPrograms POST loop
   exporter.py          save_excel (sort, autofit, freeze header)
   mailer.py            send_email — HTML list body + Excel attachment
@@ -16,7 +17,8 @@ recdesk_scraper/       package — one module per responsibility
 tests/
   fixtures/            probe_filter_pageN.html (live-portal captures)
   conftest.py          puts project root on sys.path
-  test_age_includes.py, test_extract_age_from_name.py, test_parse_programs_html.py
+  test_age_includes.py, test_extract_age_from_name.py, test_parse_programs_html.py,
+  test_registration_pipeline.py, test_grade_and_age_eligibility.py
 scripts/               probe scripts for investigating portal changes
 output/                generated XLSX (gitignored)
 logs/                  run.sh output (gitignored)
@@ -59,7 +61,25 @@ Output: `output/programs_age<AGE>_YYYYMMDD_HHMMSS.xlsx`.
 1. Playwright loads `/Community/Program` once to obtain session cookies.
 2. For each page N, POST `/Community/Program/FilterPrograms` with `Pagination.CurrentPageIndex = N`. The endpoint returns **HTML** (not JSON).
 3. `parse_programs_html` walks the tbody, tracking `category-header` rows to tag each following `sub-category-header` + `hidden-xs` detail pair.
-4. Each program's Ages cell (`"7y - 14y"`) is tested with `age_includes`. When the cell is empty/dashed, fall back to `extract_age_from_name` which extracts `"Ages 7-11"`-style phrases from the title.
+4. Age eligibility is decided by **`parser.age_eligible(program, target_age)`**, which
+   returns `(eligible, reason)`. Production and `scripts/verify_live.py` both call it,
+   so the audit cannot drift from the filtering that actually runs. Precedence:
+   1. **Ages cell** (`"7y - 14y"`) via `age_includes` — falling back to
+      `extract_age_from_name`, which pulls `"Ages 7-11"`-style phrases from the title.
+   2. **Grades cell** (`"2 - 4"`) via `grade_age_range`, since the portal restricts a
+      program by age *or* by grade and a grade-based program leaves Ages unset. A child
+      in grade N is taken to be **age N+5 to N+6**, so grades 2-4 → ages 7-10.
+      Kindergarten is grade 0, pre-K is -1.
+   3. **Neither** → no restriction, eligible at every age, which is how the portal
+      itself treats these.
+
+   Two portal conventions make this subtle, and both are load-bearing:
+   - The "no restriction" placeholder is **`- Not specified`**, *not* `-` or an empty
+     cell. Testing for emptiness silently drops every grade-based program — use
+     `has_age_info` / `grade_bounds`, which look for a usable value.
+   - A **lone age is a minimum**, not an exact match: `"18y"` is a program titled
+     "18+", and the portal returns it when filtering ages 18 through 50. When it
+     means exactly one age it writes a range instead — `"8y - 8y"`.
 5. **FULL programs are skipped** — if the Remaining cell contains the `FULL` badge, the program is excluded.
 6. Each program's registration URL (`…/Community/Program/Detail?programId=…`) is captured as an absolute link.
 7. Each program's **registration state** is classified. The portal renders a status-badge row (which sits *above* the detail row) **only for non-default states** — `Registration ended on <date>`, `Registration begins on <date>`, `No online registration`. A program that is simply open right now has **no badge at all**; its only signal is the `Register Now` button in the detail row's trailing cell. States: `open`, `upcoming`, `waitlist`, `ended`, `offline`, `unknown`. Never filter on the status *text* alone — open programs have none.
